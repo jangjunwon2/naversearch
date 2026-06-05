@@ -2,6 +2,7 @@
 // PM2 등으로 서버가 상시 떠 있으면 동작. 네이버 부하/차단 방지를 위해 최소 주기 제한.
 const engine = require('./scanEngine');
 const store = require('./store');
+const notifyEngine = require('./notifyEngine');
 
 const MIN_INTERVAL_HOURS = 6; // 최소 주기(과도한 스크래핑 방지)
 const TICK_MS = 60 * 1000; // 1분마다 due 확인
@@ -27,6 +28,14 @@ async function runSchedule(s) {
             userId: s.userId || '',
             maxPages: s.maxPages || 5,
         });
+        const record = store.getHistory().find((r) => r.id === scanId);
+        if (record) {
+            try {
+                await notifyEngine.onScanComplete(s, record);
+            } catch (e) {
+                console.error('스캔 완료 알림 오류', s.id, e.message);
+            }
+        }
     } catch (e) {
         console.error('스케줄 스캔 오류', s.id, e.message);
     } finally {
@@ -45,6 +54,11 @@ async function tick() {
             console.log(`[스케줄러] 자동 스캔 실행: ${s.name || s.id}`);
             runSchedule(s); // await 안 함 — 여러 스케줄 병렬 허용
         }
+    }
+    try {
+        await notifyEngine.maybeSendDigest();
+    } catch (e) {
+        console.error('다이제스트 발송 오류:', e.message);
     }
 }
 
