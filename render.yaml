@@ -1,0 +1,22 @@
+# Render 배포 블루프린트 (https://render.com)
+# 대시보드에서 "New + → Blueprint"로 이 저장소를 연결하면 자동 구성됩니다.
+services:
+  - type: web
+    name: naver-rank-checker
+    runtime: node
+    region: singapore # 한국에서 가장 가까운 Render 리전
+    plan: free # 항상 켜두려면 starter 이상으로 변경
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NAVER_SEARCHAD_API_KEY
+        sync: false # 대시보드에서 직접 입력
+      - key: NAVER_SEARCHAD_SECRET_KEY
+        sync: false
+      - key: NAVER_SEARCHAD_CUSTOMER_ID
+        sync: false
+      - key: NAVER_OPENAPI_CLIENT_ID
+        sync: false
+      - key: NAVER_OPENAPI_CLIENT_SECRET
+        sync: false

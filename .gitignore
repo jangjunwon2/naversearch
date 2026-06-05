@@ -1,0 +1,19 @@
+# 의존성
+node_modules/
+frontend/node_modules/
+
+# 빌드 산출물 (호스팅에서 빌드)
+frontend/dist/
+
+# 환경변수/비밀키 — 절대 커밋 금지
+.env
+.env.local
+
+# 로컬 데이터(런타임 생성) — 호스팅에선 새로 생성
+backend/store/*.json
+scan_history.json
+
+# 임시/로그
+*.log
+kw_tmp.json
+npm-debug.log*
