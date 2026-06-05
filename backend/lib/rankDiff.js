@@ -22,6 +22,7 @@ function bestOf(ranks) {
 }
 
 function keywordsOf(rec) {
+    if (!rec) return [];
     return [...new Set(rec.results.map((r) => r.keyword))];
 }
 
@@ -34,6 +35,7 @@ function computeChanges(latest, prev) {
         ]),
     ];
     const up = [], down = [], entered = [], lost = [];
+    // 순위 동일(c===p)·양쪽 미노출은 어느 배열에도 넣지 않음(변화만 수집)
     keywords.forEach((kw) => {
         const c = bestOf(extractRanks(latest, kw));
         const p = bestOf(extractRanks(prev, kw));
@@ -41,6 +43,7 @@ function computeChanges(latest, prev) {
             if (c < p) up.push({ kw, from: p, to: c });
             else if (c > p) down.push({ kw, from: p, to: c });
         } else if (typeof c === 'number' && p == null) {
+            // 신규: 이번 노출, 직전 미노출(null) 또는 직전 레코드에 키워드 없음(undefined)
             entered.push({ kw, to: c });
         } else if (c === null && typeof p === 'number') {
             lost.push({ kw, from: p });

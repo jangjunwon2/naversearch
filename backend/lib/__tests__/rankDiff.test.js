@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { extractRanks, bestOf, computeChanges, belowTarget } = require('../rankDiff');
+const { extractRanks, bestOf, keywordsOf, computeChanges, belowTarget } = require('../rankDiff');
 
 // company 모드 레코드 헬퍼: entries=[{keyword, ranks:[overallRank...]}], ranks 빈 배열=미노출
 function companyRec(id, entries) {
@@ -12,6 +12,20 @@ function companyRec(id, entries) {
             keyword: e.keyword,
             targetExposed: e.ranks.length > 0,
             targetMatches: e.ranks.map((r) => ({ overallRank: r })),
+        })),
+    };
+}
+
+// id 모드 레코드 헬퍼: entries=[{keyword, ranks:[overallRank...]}], ranks 빈 배열=미노출
+function idRec(id, entries) {
+    return {
+        id,
+        scanType: 'id',
+        userId: 'u',
+        results: entries.map((e) => ({
+            keyword: e.keyword,
+            exposed: e.ranks.length > 0,
+            userBlogMatches: e.ranks.map((r) => ({ overallRank: r })),
         })),
     };
 }
@@ -67,4 +81,32 @@ test('belowTarget: 미노출 또는 목표 초과만', () => {
         { kw: 'over', best: 15 },
         { kw: 'miss', best: null },
     ]);
+});
+
+test('extractRanks: id 모드는 userBlogMatches 기준', () => {
+    const rec = idRec('1', [{ keyword: 'k', ranks: [4, 2] }]);
+    assert.deepStrictEqual(extractRanks(rec, 'k'), [2, 4]);
+});
+
+test('extractRanks: id 모드 rankDetail 폴백', () => {
+    const rec = {
+        id: '1',
+        scanType: 'id',
+        userId: 'u',
+        results: [{ keyword: 'k', exposed: true, userBlogMatches: [], rankDetail: { overallRank: 12 } }],
+    };
+    assert.deepStrictEqual(extractRanks(rec, 'k'), [12]);
+});
+
+test('keywordsOf: 중복 제거 / falsy 레코드는 빈 배열', () => {
+    const rec = companyRec('1', [{ keyword: 'a', ranks: [1] }, { keyword: 'a', ranks: [2] }, { keyword: 'b', ranks: [] }]);
+    assert.deepStrictEqual(keywordsOf(rec), ['a', 'b']);
+    assert.deepStrictEqual(keywordsOf(null), []);
+});
+
+test('computeChanges: 순위 동일하면 어느 배열에도 없음', () => {
+    const prev = companyRec('p', [{ keyword: 'same', ranks: [5] }]);
+    const latest = companyRec('l', [{ keyword: 'same', ranks: [5] }]);
+    const c = computeChanges(latest, prev);
+    assert.deepStrictEqual(c, { up: [], down: [], entered: [], lost: [] });
 });
