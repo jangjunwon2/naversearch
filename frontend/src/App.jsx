@@ -3,7 +3,7 @@ import CompanyScanPanel from './components/CompanyScanPanel';
 import IdScanPanel from './components/IdScanPanel';
 import ForbiddenWordPanel from './components/ForbiddenWordPanel';
 import KeywordResearchPanel from './components/KeywordResearchPanel';
-import RankTrendPanel from './components/RankTrendPanel';
+import MarketingDashboard from './components/MarketingDashboard';
 import ResultsView from './components/ResultsView';
 import KeywordDetail from './components/KeywordDetail';
 import ScanHistory from './components/ScanHistory';
@@ -12,7 +12,7 @@ const TABS = [
   { key: 'company', label: '📢 업체명 체크' },
   { key: 'id', label: '📝 ID 순위' },
   { key: 'keywords', label: '🔑 키워드 리서치' },
-  { key: 'trend', label: '📈 순위 변동' },
+  { key: 'trend', label: '📊 마케팅 대시보드' },
   { key: 'forbidden', label: '🛡️ 금칙어 검사' },
   { key: 'history', label: '📅 히스토리' },
 ];
@@ -277,7 +277,7 @@ function App() {
       )}
       {activeTab === 'trend' && (
         <div className="content-area" style={{ marginTop: '0' }}>
-          <RankTrendPanel />
+          <MarketingDashboard />
         </div>
       )}
       {activeTab === 'forbidden' && (

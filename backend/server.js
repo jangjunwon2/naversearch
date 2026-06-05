@@ -33,6 +33,7 @@ app.use('/api/scan/id', scanLimiter, require('./routes/idScan')); // 기능2
 app.use('/api/forbidden', require('./routes/forbidden')); // 기능3
 app.use('/api/keywords', keywordLimiter, require('./routes/keywords')); // 키워드 리서치(검색광고 API)
 app.use('/api/keyword-lists', require('./routes/keywordLists')); // 검색어 목록 관리
+app.use('/api/schedules', require('./routes/schedules')); // 자동 스캔 스케줄
 app.use('/api', require('./routes/history')); // 히스토리/CSV export
 
 // ---- 공용 스캔 SSE 진행률 (기능1·2 공통) ----
@@ -70,6 +71,8 @@ if (process.argv.includes('--test')) {
     app.get('*', (req, res) => {
         res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
     });
+
+    require('./lib/scheduler').start(); // 자동 주기 스캔 스케줄러 가동
 
     app.listen(PORT, () => {
         console.log(`네이버 검색 순위 체크 서버 실행 중: http://localhost:${PORT}`);
