@@ -121,14 +121,16 @@ async function maybeSendDigest() {
     const seen = new Set();
     const blocks = [];
     for (const sch of store.getSchedules().filter((x) => x.enabled)) {
-        const key = `${sch.mode}|${sch.companyName || sch.userId}`;
+        const key = `${sch.mode}|${sch.companyName || sch.userId || ''}`;
         if (seen.has(key)) continue;
         seen.add(key);
         const rec = store.getHistory().find((r) => targetKeyOfRecord(r).key === key);
         if (rec) blocks.push(buildDigestBlock(rec, s.targetRank));
     }
-    if (blocks.length > 0) await notifier.sendDiscord(blocks.join('\n\n'));
-    saveSettings({ _digestLastSent: today });
+    if (blocks.length > 0) {
+        await notifier.sendDiscord(blocks.join('\n\n'));
+        saveSettings({ _digestLastSent: today });
+    }
 }
 
 async function sendTest() {
