@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Target, ArrowUp, ArrowDown, Minus, Sparkles, RefreshCw, Clock, Play, Trash2, Plus } from 'lucide-react';
+import NotificationSettings from './NotificationSettings';
 
 // 마케팅 대시보드 — 검색량+포화지수+내 순위를 합쳐 "공략 우선순위 / 변화 / 추이 / 자동스캔"
 function MarketingDashboard() {
@@ -211,7 +212,7 @@ function MarketingDashboard() {
         </div>
 
         <div className="navigation-tabs" style={{ display: 'inline-flex', marginTop: '1rem', background: 'rgba(15,23,42,0.4)' }}>
-          {[['priority', '🎯 공략 우선순위'], ['change', '🔀 변화'], ['trend', '📈 추이'], ['schedule', '⏰ 자동 스캔']].map(([k, label]) => (
+          {[['priority', '🎯 공략 우선순위'], ['change', '🔀 변화'], ['trend', '📈 추이'], ['schedule', '⏰ 자동 스캔'], ['notify', '🔔 알림']].map(([k, label]) => (
             <button key={k} type="button" className={`tab-button ${view === k ? 'active' : ''}`} onClick={() => setView(k)}>
               {label}
             </button>
@@ -335,6 +336,7 @@ function MarketingDashboard() {
           )}
         </div>
       )}
+      {view === 'notify' && <NotificationSettings />}
     </div>
   );
 }
