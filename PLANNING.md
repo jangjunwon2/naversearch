@@ -1,507 +1,144 @@
-# 네이버 검색 순위 체크 프로그램 - 기획 문서
+# 네이버 검색 순위 체크 — 기획/현황 문서
 
-## 📋 프로젝트 개요
+> 최종 업데이트: 2026-06-05
+> 상태: 핵심 기능 구현 완료, 로컬 동작 중 · 온라인 배포 준비 완료(미배포)
 
-네이버 검색에서 특정 업체명, ID, 키워드의 순위를 추적하고, 금칙어를 검사하는 통합 관리 도구
-
-**버전**: 1.0.0  
-**상태**: 기획 중  
+네이버 검색에서 업체명·작성자 ID의 노출 순위를 추적하고, 키워드 리서치(검색량·포화지수)와
+마케팅 공략 우선순위까지 제공하는 통합 SEO/마케팅 도구.
 
 ---
 
-## 🎯 핵심 기능 3가지
+## 1. 현재 구현 상태 (완료)
 
-### 1️⃣ **특정 업체 이름 체크**
+### 탭 구성
+`📢 업체명 체크 · 📝 ID 순위 · 🔑 키워드 리서치 · 📊 마케팅 대시보드 · 🛡️ 금칙어 검사 · 📅 히스토리`
 
-#### 개요
-- 사전에 설정한 **키워드 리스트**를 기준으로 네이버 검색
-- 업체명이 포함된 게시물의 **순위 추적**
-- 카페/지식인의 **댓글, 답글** 내 업체명 언급 횟수 집계
+### 기능 1 — 업체명 체크 ✅
+- 키워드 리스트 전체로 통합검색 → 업체명이 포함된 게시물(블로그/카페/지식인/인플루언서)의 **통합검색 노출 순위**
+- **카페 댓글 / 지식인 답글** 내 업체명 언급 수 + **내용 샘플(최대 3개)**
+- **📍 종합 노출 순위 표**: 키워드별로 "내 업체가 몇위·몇위에 노출되는지" 한눈에
+- SSE 실시간 진행률 + 스캔 취소
 
-#### 세부 기능
+### 기능 2 — ID별 순위 체크 ✅
+- 특정 작성자 ID 글이 통합검색에서 몇 위인지, 미노출 시 **블로그 탭 몇 페이지 몇 번째**(폴백)
 
-| 기능 | 설명 | 대상 |
-|------|------|------|
-| **통합검색 순위** | 각 키워드당 업체명의 순위 기록 | 블로그, 뉴스, 웹문서 |
-| **카페 댓글 추적** | 해당 게시물의 댓글에 업체명 포함 여부 & 개수 | 카페 게시물 |
-| **지식인 답글 추적** | 질문의 답변/댓글에 업체명 포함 여부 & 개수 | 지식인 게시물 |
-| **시간대별 기록** | 언제 검색했는지, 순위 변화 추적 | 모든 결과 |
+### 기능 3 — 금칙어 검사 ✅
+- 금칙어 사전 CRUD(단건/일괄) + 본문 검사
+- **띄어쓰기 무시** 매칭("도 박" → "도박") + 원문 하이라이트
 
-#### 데이터 구조
-```javascript
-{
-  scanId: "20260605_company_scan_001",
-  scanType: "company_name",
-  companyName: "회사명",
-  keywords: ["키워드1", "키워드2"],
-  results: [
-    {
-      keyword: "키워드1",
-      searchResults: [
-        {
-          rank: 1,
-          title: "게시물 제목",
-          url: "https://...",
-          source: "blog|cafe|kin", // 블로그, 카페, 지식인
-          excerpt: "미리보기 텍스트"
-        }
-      ],
-      cafeComments: {
-        totalCount: 5,
-        posts: [
-          {
-            url: "https://cafe.naver.com/...",
-            commentCount: 3,
-            commentSamples: ["업체명이 들어간 댓글", ...]
-          }
-        ]
-      },
-      kinAnswers: {
-        totalCount: 2,
-        posts: [...]
-      }
-    }
-  ],
-  timestamp: "2026-06-05T10:30:00Z"
-}
+### 기능 4 — 키워드 리서치 ✅
+- **검색광고 키워드도구 API**: 연관 키워드 + 월간 검색수(PC/모바일) + 막대그래프
+- **검색 오픈 API(블로그)**: 블로그 총 문서수, 최근 30일 제목 매치 월 발행량
+- **콘텐츠 포화지수**(블랙키위식: 월발행량÷검색량×100, 5단계 라벨) + **누적경쟁**(블로그총÷검색량)
+- **입력 키워드 전체**(최대 100개, 5개씩 배치) + **CSV/엑셀 업로드** + 정렬/필터 + CSV 내보내기
+- 행 선택 → 목록 저장 / 업체명·ID 스캔으로 전송
+
+### 기능 5 — 마케팅 대시보드 ✅
+- **🎯 공략 우선순위**: 검색량+포화지수+내 순위 → 기회점수 + 액션(🔥최우선/✍️공략/📈개선/🛡️유지)
+- **🔀 변화 하이라이트**: 직전 스캔 대비 상승/하락/신규진입/이탈
+- **📈 추이**: 누적 스캔의 순위 추이 표
+- **⏰ 자동 주기 스캔**: 6/12/24h·2일·주1회 스케줄(최소 6h) → 추이 자동 누적, ON/OFF·지금실행·삭제
+
+### 부가 기능 ✅
+- **검색어 목록 관리**: 키워드 세트 저장/불러오기/삭제 → 원클릭 스캔
+- **히스토리**: 저장/불러오기/삭제 + **CSV export**
+- **비밀번호 게이트**(opt-in): `APP_PASSWORD` 설정 시 진입 보호
+- **레이트리밋**: 공개 배포 시 API 남용 방지(IP당 분당 스캔15·키워드20)
+- **네이버 구조변경 대응**: 전체 페이지 URL 기반 감지 + 폴백 수집 + 블록 병합(클래스 변경에도 누락 0)
+
+---
+
+## 2. 아키텍처
+
+```
+backend/
+├── server.js              # Express 진입점(라우트 마운트 + SSE + 정적 서빙 + 스케줄러 가동)
+├── lib/
+│   ├── naverClient.js     # UA/헤더/sleep/URL정규화/횟수카운트
+│   ├── integratedSearch.js# 통합검색 스마트블록 파싱(블로그/카페/지식인/인플루언서)
+│   ├── blogTab.js         # 블로그 탭 폴백(페이지/순번)
+│   ├── cafeComments.js    # 카페 댓글 집계 + 샘플
+│   ├── kinAnswers.js      # 지식인 답글 집계 + 샘플
+│   ├── forbiddenMatcher.js# 금칙어 매칭(공백 무시 + 위치 매핑)
+│   ├── scanEngine.js      # 공용 SSE 스캔 엔진(company/id)
+│   ├── searchAdClient.js  # 검색광고 키워드도구 API(HMAC 서명)
+│   ├── blogSearchApi.js   # 검색 오픈 API(블로그 총수/월발행)
+│   ├── store.js           # JSON 저장소(history/forbidden/keyword-lists/schedules)
+│   ├── scheduler.js       # 자동 주기 스캔 루프
+│   ├── rateLimit.js       # 인메모리 IP 레이트리밋
+│   ├── auth.js            # 비밀번호 게이트
+│   └── loadEnv.js         # .env 로더(무의존)
+├── routes/                # companyScan·idScan·forbidden·keywords·keywordLists·schedules·history·auth
+└── store/                 # *.json (런타임 생성, git 제외)
+
+frontend/src/
+├── App.jsx                # 탭 네비 + 스캔 SSE 오케스트레이션
+├── components/            # CompanyScanPanel·IdScanPanel·KeywordResearchPanel·MarketingDashboard
+│                          # ResultsView·KeywordDetail·ScanHistory·ForbiddenWordPanel
+│                          # KeywordListControls·ScanProgress·AuthGate
 ```
 
----
+### 기술 스택
+React 18 + Vite / Express 4 + Cheerio / JSON 파일 저장 / xlsx(동적 임포트) / lucide-react
 
-### 2️⃣ **ID별 순위 체크**
+### 주요 API 엔드포인트
+- 스캔: `POST /api/scan/company`·`/api/scan/id`, `GET /api/scan/progress`(SSE), `POST /api/scan/cancel`
+- 금칙어: `GET/POST/PUT/DELETE /api/forbidden/words`, `POST /api/forbidden/check`
+- 키워드: `POST /api/keywords`
+- 검색어 목록: `GET/POST/PUT/DELETE /api/keyword-lists`
+- 스케줄: `GET/POST/PUT/DELETE /api/schedules`, `POST /api/schedules/:id/run`
+- 히스토리: `GET /api/history`, `DELETE /api/history/:id`, `GET /api/export/:scanId`
+- 인증: `GET /api/auth/status`, `POST /api/auth/login`·`/logout`
 
-#### 개요
-- 특정 **아이디(작성자ID)**로 작성한 게시물 추적
-- 통합검색에서의 **순위 확인**
-- 통합검색에 미노출시 **블로그 탭 페이지 위치** 확인
+### 환경변수(.env)
+```
+NAVER_SEARCHAD_API_KEY / NAVER_SEARCHAD_SECRET_KEY / NAVER_SEARCHAD_CUSTOMER_ID  # 검색광고
+NAVER_OPENAPI_CLIENT_ID / NAVER_OPENAPI_CLIENT_SECRET                            # 검색 오픈API
+APP_PASSWORD   # (선택) 접근 비밀번호
+PORT           # (선택) 기본 5000
+```
 
-#### 세부 기능
-
-| 기능 | 설명 | 상세 |
-|------|------|------|
-| **통합검색 순위 감지** | 해당 ID의 글이 통합검색에서 몇 위인지 확인 | 순위 1-30 기록 |
-| **블로그 탭 위치** | 통합검색에 없으면 블로그 탭에서 검색 | 페이지/순번 기록 |
-| **여러 키워드 검색** | 표에 정리된 모든 키워드로 한 번에 검색 | 일괄 처리 |
-| **글 URL 자동 감지** | 검색된 글의 URL 기록 | 추후 모니터링용 |
-
-#### 데이터 구조
-```javascript
-{
-  scanId: "20260605_id_scan_001",
-  scanType: "user_id",
-  userId: "사용자아이디",
-  platform: "blog|cafe|kin",
-  keywords: ["키워드1", "키워드2"],
-  results: [
-    {
-      keyword: "키워드1",
-      status: "found|not_found",
-      location: {
-        section: "integrated|blog|cafe|kin",
-        rank: 5,                    // 통합검색에서의 순위
-        pageNumber: 2,              // 블로그 탭 페이지
-        positionInPage: 3           // 해당 페이지의 몇 번째
-      },
-      postUrl: "https://...",
-      foundAt: "2026-06-05T10:30:00Z"
-    }
-  ],
-  timestamp: "2026-06-05T10:30:00Z"
-}
+### 실행
+```
+npm run setup   # 루트+프론트 의존성 설치
+npm run build   # 프론트 빌드
+npm start       # http://localhost:5000
 ```
 
 ---
 
-### 3️⃣ **금칙어 검색 (Forbidden Word Check)**
+## 3. 배포 현황
 
-#### 개요
-- 미리 정의된 **금칙어 사전** 관리
-- 현재 작성한 게시글에 **금칙어가 얼마나 포함**되어 있는지 검사
-- **띄어쓰기 무시** 기준으로 매칭
-
-#### 세부 기능
-
-| 기능 | 설명 | 예시 |
-|------|------|------|
-| **금칙어 사전 관리** | 금칙어 리스트 추가/삭제/편집 | UI에서 직접 관리 |
-| **텍스트 입력 분석** | 게시글 본문에서 금칙어 검출 | 실시간 검사 |
-| **띄어쓰기 무시 매칭** | 띄어쓰기를 무시하고 검사 | "나쁜말" = "나 쁜 말" 인식 |
-| **결과 리포트** | 금칙어별 포함 개수 & 위치 표시 | 하이라이트 표시 |
-
-#### 데이터 구조
-```javascript
-{
-  scanId: "20260605_forbidden_scan_001",
-  scanType: "forbidden_words",
-  text: "검사할 게시글 본문",
-  forbiddenWords: [
-    {
-      word: "금칙어",
-      category: "negative|marketing|etc",
-      severity: "high|medium|low"
-    }
-  ],
-  results: [
-    {
-      word: "금칙어",
-      count: 3,
-      positions: [
-        {
-          index: 5,
-          context: "...금칙어포함된문맥..."
-        }
-      ]
-    }
-  ],
-  timestamp: "2026-06-05T10:30:00Z"
-}
-```
+- **방식 확정**: Oracle Cloud Always Free + **춘천(한국)** 리전 VPS (무료 영구 · 한국 IP로 네이버 차단 회피 · 상시)
+- **준비 완료**: `git` 초기화 + GitHub 푸시(`jangjunwon2/naversearch`), `render.yaml`, `.gitignore`, `DEPLOY.md`, `ORACLE-DEPLOY.md`, 레이트리밋, 비밀번호 게이트
+- **공개 정책**: 누구나 공개 + 내 API 키 공유 (→ 레이트리밋으로 보호, 필요 시 `APP_PASSWORD` 권장)
+- **보류**: 오라클 가입/콘솔 에러로 VM 생성 대기 중 → 해결되면 `ORACLE-DEPLOY.md` 따라 진행
 
 ---
 
-## 🏗️ 시스템 아키텍처
+## 4. 앞으로 할 일 (로드맵)
 
-### 전체 흐름도
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Frontend (React + Vite)                   │
-│  ┌──────────────┐  ┌────────────────┐  ┌──────────────────┐ │
-│  │ Control      │  │ Dashboard &    │  │ Forbidden Word  │ │
-│  │ Panel        │  │ Results        │  │ Manager         │ │
-│  └──────────────┘  └────────────────┘  └──────────────────┘ │
-└──────────────┬──────────────────────────────────────────────┘
-               │ HTTP/API
-┌──────────────▼──────────────────────────────────────────────┐
-│              Backend (Express.js + Cheerio)                  │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │ API Routes:                                          │  │
-│  │ • POST /api/scan/company-name                       │  │
-│  │ • POST /api/scan/user-id                            │  │
-│  │ • POST /api/check/forbidden-words                   │  │
-│  │ • GET /api/scan-history                             │  │
-│  │ • POST /api/forbidden-words (CRUD)                  │  │
-│  └──────────────────────────────────────────────────────┘  │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │ Core Services:                                       │  │
-│  │ • NaverSearchScraper (웹 크롤링)                     │  │
-│  │ • CommentAnalyzer (댓글/답글 분석)                   │  │
-│  │ • ForbiddenWordMatcher (금칙어 검사)                │  │
-│  │ • RankTracker (순위 추적)                            │  │
-│  └──────────────────────────────────────────────────────┘  │
-└──────────────┬──────────────────────────────────────────────┘
-               │
-┌──────────────▼──────────────────────────────────────────────┐
-│              Database (SQLite / JSON)                        │
-│  • scan_results (검색 결과)                                 │
-│  • scan_history (검색 히스토리)                             │
-│  • forbidden_words (금칙어 사전)                            │
-│  • keyword_lists (키워드 템플릿)                            │
-│  • user_settings (사용자 설정)                              │
-└─────────────────────────────────────────────────────────────┘
-```
+### 배포 마무리
+- [ ] Oracle Cloud 춘천 VM 생성 → 방화벽(2겹)·Node·PM2·스왑 → `git clone` + `.env` + `npm run build` + `pm2 start`
+- [ ] (선택) 도메인 연결 + Nginx 리버스 프록시 + HTTPS(certbot) — SSE 위해 `proxy_buffering off`
+- [ ] (선택) 데이터 영속 디스크 / 외부 DB (재배포 시 히스토리·목록 보존)
+
+### 기능 고도화
+- [ ] **경쟁사 비교**: 내 업체 vs 경쟁 업체(들)를 같은 키워드에서 나란히 비교(점유 현황)
+- [ ] **포화지수 정확도**: 월 발행량 표본(최근 100건) 한계 → 페이징/캐싱으로 정확도 개선(공개 배포 시 호출량 균형 고려)
+- [ ] **알림**: 순위 급락/신규 진입/이탈 시 알림(이메일·웹훅 등)
+- [ ] **지식인 답글 양성 케이스 검증**: 업체명이 실제 답글에 달린 글로 `kinAnswers.js` 셀렉터 정밀화
+- [ ] **키워드 리서치 대량 처리 UX**: 100개 초과 분할 안내, 진행률 표시 강화
+
+### 품질/운영
+- [ ] 테스트 코드(스크래퍼 파서·금칙어 매칭·포화지수 계산 단위 테스트)
+- [ ] 진단 스크립트 정리(`backend/probe.js`·`kin-probe.js`·`e2e-test.js`는 운영용 진단 도구로 유지)
+- [ ] 에러 로깅/모니터링(배포 후 `pm2 logs` 기반)
 
 ---
 
-## 📊 데이터베이스 스키마
-
-### 테이블 1: `scan_results`
-```sql
-CREATE TABLE scan_results (
-  id TEXT PRIMARY KEY,
-  scan_type VARCHAR(50),           -- 'company_name' | 'user_id' | 'forbidden_words'
-  search_keyword VARCHAR(255),
-  result_data JSON,               -- 검색 결과 상세 데이터
-  created_at DATETIME,
-  updated_at DATETIME,
-  status VARCHAR(50)              -- 'pending' | 'completed' | 'failed'
-);
-```
-
-### 테이블 2: `scan_history`
-```sql
-CREATE TABLE scan_history (
-  id INTEGER PRIMARY KEY,
-  scan_id TEXT,
-  scan_type VARCHAR(50),
-  keywords TEXT,                  -- JSON array
-  result_summary TEXT,           -- 간단한 요약
-  created_at DATETIME
-);
-```
-
-### 테이블 3: `forbidden_words`
-```sql
-CREATE TABLE forbidden_words (
-  id INTEGER PRIMARY KEY,
-  word VARCHAR(255) UNIQUE,
-  category VARCHAR(100),          -- 'negative' | 'marketing' | 'spam' etc
-  severity VARCHAR(50),           -- 'high' | 'medium' | 'low'
-  created_at DATETIME,
-  updated_at DATETIME
-);
-```
-
-### 테이블 4: `keyword_lists`
-```sql
-CREATE TABLE keyword_lists (
-  id INTEGER PRIMARY KEY,
-  list_name VARCHAR(255),
-  keywords TEXT,                 -- JSON array
-  created_at DATETIME,
-  updated_at DATETIME
-);
-```
-
----
-
-## 🔌 API 엔드포인트 설계
-
-### 1. 특정 업체명 검색
-```
-POST /api/scan/company-name
-Content-Type: application/json
-
-Request:
-{
-  "companyName": "회사명",
-  "keywords": ["키워드1", "키워드2"],
-  "checkCafeComments": true,
-  "checkKinAnswers": true
-}
-
-Response:
-{
-  "scanId": "20260605_company_scan_001",
-  "status": "completed",
-  "results": [...]
-}
-```
-
-### 2. ID별 순위 검색
-```
-POST /api/scan/user-id
-Content-Type: application/json
-
-Request:
-{
-  "userId": "사용자아이디",
-  "platform": "blog",  -- blog | cafe | kin
-  "keywords": ["키워드1", "키워드2"],
-  "searchBlogFallback": true
-}
-
-Response:
-{
-  "scanId": "20260605_id_scan_001",
-  "status": "completed",
-  "results": [...]
-}
-```
-
-### 3. 금칙어 검사
-```
-POST /api/check/forbidden-words
-Content-Type: application/json
-
-Request:
-{
-  "text": "검사할 게시글 본문",
-  "ignoreSpaces": true
-}
-
-Response:
-{
-  "scanId": "20260605_forbidden_scan_001",
-  "totalViolations": 5,
-  "results": [...]
-}
-```
-
-### 4. 금칙어 사전 관리
-```
-GET  /api/forbidden-words                  -- 전체 조회
-POST /api/forbidden-words                  -- 추가
-PUT  /api/forbidden-words/:id              -- 수정
-DELETE /api/forbidden-words/:id            -- 삭제
-```
-
-### 5. 스캔 히스토리 조회
-```
-GET /api/scan-history?type=company_name&limit=20
-GET /api/scan-history/:scanId
-```
-
----
-
-## 🎨 UI/UX 구조
-
-### 페이지 1: Control Panel (제어 패널)
-```
-┌─────────────────────────────────┐
-│  네이버 검색 순위 체커           │
-├─────────────────────────────────┤
-│  
-│  [1] 특정 업체명 체크
-│  ┌─────────────────────────────┐
-│  │ 업체명: [입력칸]             │
-│  │ 키워드 목록:                  │
-│  │ ☐ 키워드1                    │
-│  │ ☐ 키워드2                    │
-│  │ ☐ 키워드3 추가하기           │
-│  │ ☑ 카페 댓글 확인            │
-│  │ ☑ 지식인 답글 확인          │
-│  │ [검색 시작]                   │
-│  └─────────────────────────────┘
-│
-│  [2] ID별 순위 체크
-│  ┌─────────────────────────────┐
-│  │ 아이디: [입력칸]             │
-│  │ 플랫폼: [블로그▼]            │
-│  │ 키워드 목록: [선택칸▼]      │
-│  │ ☑ 블로그 탭도 검색          │
-│  │ [검색 시작]                   │
-│  └─────────────────────────────┘
-│
-│  [3] 금칙어 검사
-│  ┌─────────────────────────────┐
-│  │ [텍스트 입력 또는 붙여넣기]  │
-│  │                              │
-│  │ [분석 시작]                   │
-│  └─────────────────────────────┘
-│
-└─────────────────────────────────┘
-```
-
-### 페이지 2: Dashboard (결과 조회)
-```
-┌──────────────────────────────────────┐
-│  검색 결과                            │
-├──────────────────────────────────────┤
-│
-│  필터: [스캔 타입▼] [기간▼]
-│
-│  ┌──────────────────────────────────┐
-│  │ 2026-06-05 | 회사명 검색         │
-│  │ 📊 결과 보기                      │
-│  │ 🗑️ 삭제                          │
-│  └──────────────────────────────────┘
-│
-│  ┌─────────────────────────────────────────────────────┐
-│  │ 키워드 | 순위 | 원본URL | 카페댓글 | 지식인답글  │
-│  ├─────────────────────────────────────────────────────┤
-│  │ 키워드1│  3위 │ [링크]  │   5개    │    2개     │
-│  │ 키워드2│ 12위 │ [링크]  │   0개    │    0개     │
-│  │ 키워드3│미노출│   -     │   -      │    -       │
-│  └─────────────────────────────────────────────────────┘
-│
-└──────────────────────────────────────┘
-```
-
-### 페이지 3: 금칙어 관리자
-```
-┌─────────────────────────────────────┐
-│  금칙어 사전                         │
-├─────────────────────────────────────┤
-│
-│  [+ 새 금칙어 추가]
-│
-│  ┌────────────────────────────────┐
-│  │ 검색: [입력칸]                │
-│  └────────────────────────────────┘
-│
-│  ┌────────────────────────────────────────┐
-│  │ 금칙어 | 카테고리 | 심각도 | 작업    │
-│  ├────────────────────────────────────────┤
-│  │ 나쁜말  │ 부정  │ 높음  │ ✏️ 🗑️   │
-│  │ 스팸    │ 스팸  │ 높음  │ ✏️ 🗑️   │
-│  │ 광고    │ 마케팅│ 중간  │ ✏️ 🗑️   │
-│  └────────────────────────────────────────┘
-│
-└─────────────────────────────────────┘
-```
-
----
-
-## 🔧 기술 스택
-
-| 영역 | 기술 | 버전 |
-|------|------|------|
-| **Frontend** | React | 18.3.x |
-| **Frontend Build** | Vite | 5.3.x |
-| **Backend** | Express.js | 4.21.x |
-| **Scraping** | Cheerio | 1.0.x |
-| **Database** | SQLite3 | 최신 |
-| **HTTP Client** | node-fetch | 최신 |
-| **CORS** | cors | 2.8.x |
-| **CLI** | Node.js | 18.x+ |
-
----
-
-## 📅 개발 로드맵
-
-### Phase 1: 기반 구축 (1주)
-- [ ] 백엔드 API 라우팅 구조 설정
-- [ ] SQLite 데이터베이스 스키마 작성
-- [ ] 네이버 검색 크롤러 기본 모듈 개발
-- [ ] CORS/Express 미들웨어 설정
-
-### Phase 2: 특정 업체명 검색 (2주)
-- [ ] 통합검색 결과 파싱 로직
-- [ ] 카페 댓글 크롤링 기능
-- [ ] 지식인 답글 크롤링 기능
-- [ ] 결과 저장 및 조회 API
-- [ ] 프론트엔드 UI 구현
-
-### Phase 3: ID별 순위 검색 (1.5주)
-- [ ] 특정 ID의 글 검색 로직
-- [ ] 블로그 탭 폴백 검색
-- [ ] 순위 추적 로직
-- [ ] 프론트엔드 UI 구현
-
-### Phase 4: 금칙어 검사 (1주)
-- [ ] 금칙어 사전 CRUD API
-- [ ] 띄어쓰기 무시 매칭 알고리즘
-- [ ] 텍스트 분석 엔진
-- [ ] 프론트엔드 UI 구현
-
-### Phase 5: 고도화 및 최적화 (1.5주)
-- [ ] 에러 핸들링 강화
-- [ ] 성능 최적화
-- [ ] 테스트 작성
-- [ ] 배포 준비
-
----
-
-## ⚠️ 기술적 고려사항
-
-### 1. 네이버 크롤링 정책
-- User-Agent 설정 필수
-- 요청 간격 조절 (과도한 크롤링 방지)
-- robots.txt 준수
-- IP 차단 시 프록시 고려
-
-### 2. 성능
-- 대량 키워드 검색시 병렬 처리
-- 검색 결과 캐싱
-- 진행 상황 실시간 업데이트 (WebSocket 고려)
-
-### 3. 정확성
-- 동일한 게시물 중복 제거
-- URL 정규화
-- 순위 변동 추적
-
-### 4. 보안
-- 입력값 검증
-- XSS 방지
-- SQL Injection 방지 (Parameterized Query)
-
----
-
-## 📝 다음 단계
-
-1. **데이터베이스 설계 상세화** - SQL 스키마 작성
-2. **API 상세 설계** - 요청/응답 예시 작성
-3. **프론트엔드 컴포넌트 구조** - React 컴포넌트 계층도
-4. **개발 시작** - Phase 1부터 단계별 진행
-
----
+## 5. 알려진 제약
+- 순위 스캔은 네이버 검색 페이지 스크래핑 기반 → **해외 IP는 차단 가능**(한국 VPS로 회피)
+- 네이버 통합검색 블록 순서는 **시점·세션(로그인)에 따라 변동** → 도구는 받은 응답을 그대로 반영
+- 월 발행량/포화지수는 **블로그 기준**(오픈API가 카페글 발행일자 미제공)이며 인기 키워드는 표본 한계로 보수적
+- 공개 + 공유 키 구성은 API 할당량을 함께 소진 → 레이트리밋·비밀번호 게이트로 완화
