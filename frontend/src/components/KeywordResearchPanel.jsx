@@ -1,33 +1,40 @@
 import React, { useState } from 'react';
-import { Search, BarChart3, Copy, TrendingUp, AlertCircle, Save, Download, ArrowRightCircle } from 'lucide-react';
+import { Search, BarChart3, Copy, TrendingUp, AlertCircle, Save, Download, ArrowRightCircle, Upload } from 'lucide-react';
 
-// 기능4: 키워드 리서치 — 검색광고 키워드도구 API (연관키워드 + 월간검색량 + 그래프)
+// 기능4: 키워드 리서치 — 검색광고 키워드도구 API (입력 키워드 전체 + 연관키워드 + 그래프)
 // onSendToScan(mode, keywords[]): 선택 키워드를 업체명/ID 스캔 탭으로 전달
 function KeywordResearchPanel({ onSendToScan }) {
   const [seedInput, setSeedInput] = useState('광주 방탈출');
-  const [rows, setRows] = useState([]);
+  const [rows, setRows] = useState([]); // 입력 키워드 결과
+  const [related, setRelated] = useState([]); // 연관 키워드 결과
+  const [showRelated, setShowRelated] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [sortKey, setSortKey] = useState('monthlyTotal');
   const [selected, setSelected] = useState(() => new Set());
   const [blogStatsAvailable, setBlogStatsAvailable] = useState(true);
+  const [inputCount, setInputCount] = useState(0);
+
+  const parseKeywords = (text) =>
+    text
+      .split(/[\n,\t]/)
+      .map((k) => k.trim())
+      .filter((k) => k.length > 0);
 
   const handleSearch = async (e) => {
     e.preventDefault();
-    const keywords = seedInput
-      .split(/[\n,]/)
-      .map((k) => k.trim())
-      .filter((k) => k.length > 0)
-      .slice(0, 5);
+    const keywords = parseKeywords(seedInput).slice(0, 100);
     if (keywords.length === 0) {
-      alert('키워드를 입력해주세요 (최대 5개).');
+      alert('키워드를 입력해주세요 (최대 100개).');
       return;
     }
 
     setLoading(true);
     setError(null);
     setRows([]);
+    setRelated([]);
     setSelected(new Set());
+    setInputCount(keywords.length);
     try {
       const res = await fetch('/api/keywords', {
         method: 'POST',
@@ -37,6 +44,7 @@ function KeywordResearchPanel({ onSendToScan }) {
       const data = await res.json();
       if (res.ok) {
         setRows(data.keywords);
+        setRelated(data.related || []);
         setBlogStatsAvailable(data.blogStatsAvailable !== false);
       } else {
         setError({ code: data.code, message: data.error });
@@ -48,7 +56,37 @@ function KeywordResearchPanel({ onSendToScan }) {
     }
   };
 
-  const sorted = [...rows].sort((a, b) => {
+  // CSV/TXT/Excel 파일에서 키워드 읽어 입력란에 채우기
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      let kws = [];
+      if (/\.(xlsx|xls)$/i.test(file.name)) {
+        const XLSX = await import('xlsx'); // 파일 업로드 시에만 로드(초기 번들 경량화)
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf);
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const grid = XLSX.utils.sheet_to_json(ws, { header: 1 });
+        kws = grid.flat().map((c) => String(c).trim()).filter(Boolean);
+      } else {
+        const text = await file.text();
+        kws = parseKeywords(text);
+      }
+      if (kws.length) {
+        setSeedInput(kws.join('\n'));
+        alert(`${kws.length}개 키워드를 불러왔습니다. "조회"를 눌러주세요.`);
+      } else {
+        alert('파일에서 키워드를 찾지 못했습니다.');
+      }
+    } catch (err) {
+      alert('파일 파싱 실패: ' + err.message);
+    }
+    e.target.value = '';
+  };
+
+  const baseRows = showRelated ? [...rows, ...related] : rows;
+  const sorted = [...baseRows].sort((a, b) => {
     const av = a[sortKey] ?? -1;
     const bv = b[sortKey] ?? -1;
     return bv - av;
@@ -150,21 +188,32 @@ function KeywordResearchPanel({ onSendToScan }) {
           <TrendingUp size={18} style={{ color: 'var(--accent-cyan)' }} /> 키워드 리서치 (검색광고)
         </h3>
         <p style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', marginBottom: '0.75rem' }}>
-          시드 키워드(최대 5개)를 넣으면 연관 키워드와 월간 검색수(PC/모바일), 경쟁정도를 가져옵니다.
+          입력한 키워드 <strong>전체</strong>의 월간 검색수(PC/모바일)·블로그 발행량·포화지수를 한 번에 가져옵니다. 줄바꿈/쉼표로 여러 개(최대 100개), 또는 CSV/엑셀 업로드.
         </p>
         <form onSubmit={handleSearch} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
           <textarea
             className="form-input form-textarea"
             value={seedInput}
             onChange={(e) => setSeedInput(e.target.value)}
-            placeholder="예: 광주 방탈출 (줄바꿈/쉼표로 여러 개, 최대 5)"
-            style={{ minHeight: '70px', flex: 1 }}
+            placeholder="예:&#10;광주 방탈출&#10;충장로 방탈출&#10;광주 데이트코스"
+            style={{ minHeight: '90px', flex: 1 }}
             disabled={loading}
           />
-          <button type="submit" className="btn-primary" style={{ width: 'auto', padding: '0 1.2rem', alignSelf: 'stretch' }} disabled={loading}>
-            <Search size={16} /> {loading ? '조회 중...' : '조회'}
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignSelf: 'stretch' }}>
+            <button type="submit" className="btn-primary" style={{ width: 'auto', padding: '0 1.2rem', flex: 1 }} disabled={loading}>
+              <Search size={16} /> {loading ? `조회 중...(${inputCount}개)` : '조회'}
+            </button>
+            <label className="btn-secondary" style={{ width: 'auto', padding: '0 1rem', cursor: 'pointer', justifyContent: 'center' }} title="CSV/엑셀에서 키워드 불러오기">
+              <Upload size={14} /> 파일
+              <input type="file" accept=".csv,.txt,.xlsx,.xls" onChange={handleFile} style={{ display: 'none' }} disabled={loading} />
+            </label>
+          </div>
         </form>
+        {loading && inputCount > 20 && (
+          <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '0.5rem' }}>
+            키워드가 많아 시간이 걸립니다(블로그 통계 수집). 잠시만요…
+          </p>
+        )}
       </div>
 
       {/* 에러 */}
@@ -231,8 +280,15 @@ function KeywordResearchPanel({ onSendToScan }) {
       {sorted.length > 0 && (
         <div className="glass-card">
           <div className="section-header" style={{ marginBottom: '1rem' }}>
-            <h2 style={{ fontSize: '1.1rem' }}>연관 키워드 ({sorted.length}개)</h2>
+            <h2 style={{ fontSize: '1.1rem' }}>
+              키워드 분석 ({rows.length}개{showRelated && related.length > 0 ? ` + 연관 ${related.length}` : ''})
+            </h2>
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              {related.length > 0 && (
+                <button type="button" className="btn-secondary" onClick={() => setShowRelated((v) => !v)}>
+                  {showRelated ? '연관 숨기기' : `연관 ${related.length}개 보기`}
+                </button>
+              )}
               <button type="button" className="btn-secondary" onClick={() => sendToScan('company')} title="선택(없으면 전체) 키워드로 업체명 스캔">
                 <ArrowRightCircle size={14} /> 업체명 스캔
               </button>

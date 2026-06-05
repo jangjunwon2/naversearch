@@ -56,6 +56,54 @@ function ResultsView({ results, onSelectKeyword, selectedKeywordIndex, mode, com
         </div>
       )}
 
+      {/* 업체명 종합 노출 순위 표 (brand 모드) */}
+      {mode === 'brand' && (
+        <div className="glass-card" style={{ marginBottom: '1.5rem' }}>
+          <h3 className="detail-panel-title" style={{ marginBottom: '0.25rem' }}>
+            📍 키워드별 "{companyName}" 통합검색 노출 순위 종합
+          </h3>
+          <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '0.75rem' }}>
+            숫자 = 통합검색 전체에서 위→아래 몇 번째 노출인지(낮을수록 상위). 한 키워드에서 여러 번 노출되면 모두 표시.
+          </p>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+              <thead>
+                <tr style={{ textAlign: 'left', color: 'var(--color-text-muted)', borderBottom: '1px solid var(--border-color)' }}>
+                  <th style={{ padding: '0.5rem' }}>키워드</th>
+                  <th style={{ padding: '0.5rem' }}>통합검색 노출 순위</th>
+                  <th style={{ padding: '0.5rem', textAlign: 'center' }}>노출 수</th>
+                  <th style={{ padding: '0.5rem', textAlign: 'center' }}>카페댓글</th>
+                  <th style={{ padding: '0.5rem', textAlign: 'center' }}>지식인답글</th>
+                </tr>
+              </thead>
+              <tbody>
+                {results.map((item, idx) => {
+                  const ranks = (item.targetMatches || [])
+                    .map((m) => m.overallRank || m.rankInBlock)
+                    .filter(Boolean)
+                    .sort((a, b) => a - b);
+                  return (
+                    <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                      <td style={{ padding: '0.5rem', fontWeight: 600 }}>{item.keyword}</td>
+                      <td style={{ padding: '0.5rem' }}>
+                        {ranks.length ? (
+                          <span style={{ color: 'var(--accent-rose)', fontWeight: 700 }}>{ranks.map((r) => `${r}위`).join(', ')}</span>
+                        ) : (
+                          <span style={{ color: 'var(--color-text-muted)' }}>미노출</span>
+                        )}
+                      </td>
+                      <td style={{ padding: '0.5rem', textAlign: 'center' }}>{ranks.length || '-'}</td>
+                      <td style={{ padding: '0.5rem', textAlign: 'center' }}>{item.cafeCommentMatchesCount || 0}</td>
+                      <td style={{ padding: '0.5rem', textAlign: 'center' }}>{item.kinAnswerMatchesCount || 0}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* 검색 + 카드 목록 */}
       <div className="section-header">
         <h2>{mode === 'brand' ? `업체명 "${companyName}" 노출 상세` : `작성자 ID "${userId}" 순위 상세`}</h2>
