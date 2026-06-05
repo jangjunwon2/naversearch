@@ -7,6 +7,7 @@ const HISTORY_FILE = path.join(STORE_DIR, 'history.json');
 const FORBIDDEN_FILE = path.join(STORE_DIR, 'forbidden-words.json');
 const KEYWORD_LISTS_FILE = path.join(STORE_DIR, 'keyword-lists.json');
 const SCHEDULES_FILE = path.join(STORE_DIR, 'schedules.json');
+const NOTIFICATIONS_FILE = path.join(STORE_DIR, 'notifications.json');
 const LEGACY_HISTORY = path.join(__dirname, '..', '..', 'scan_history.json');
 
 const MAX_HISTORY = 50;
@@ -94,6 +95,16 @@ function saveSchedules(list) {
     return list;
 }
 
+// ---- 알림 설정 ----
+function getNotifications() {
+    return readJson(NOTIFICATIONS_FILE, {});
+}
+
+function saveNotifications(obj) {
+    writeJson(NOTIFICATIONS_FILE, obj);
+    return obj;
+}
+
 ensureStore();
 
 module.exports = {
@@ -106,4 +117,6 @@ module.exports = {
     saveKeywordLists,
     getSchedules,
     saveSchedules,
+    getNotifications,
+    saveNotifications,
 };
