@@ -34,6 +34,7 @@ app.use('/api/forbidden', require('./routes/forbidden')); // 기능3
 app.use('/api/keywords', keywordLimiter, require('./routes/keywords')); // 키워드 리서치(검색광고 API)
 app.use('/api/keyword-lists', require('./routes/keywordLists')); // 검색어 목록 관리
 app.use('/api/schedules', require('./routes/schedules')); // 자동 스캔 스케줄
+app.use('/api/notifications', require('./routes/notifications')); // 알림 설정
 app.use('/api', require('./routes/history')); // 히스토리/CSV export
 
 // ---- 공용 스캔 SSE 진행률 (기능1·2 공통) ----
