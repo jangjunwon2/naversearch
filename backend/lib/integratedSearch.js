@@ -204,8 +204,18 @@ async function scrapeIntegratedSearch(keyword, targetKeyword, userBlogId) {
 
         let commentMatchesCount = 0;
         let kinMatchesCount = 0;
-        if (targetKeyword && type === 'cafe') commentMatchesCount = await scrapeCafeComments(normalized, targetKeyword);
-        if (targetKeyword && type === 'kin') kinMatchesCount = await scrapeKinAnswers(normalized, targetKeyword);
+        let commentSamples = [];
+        let kinSamples = [];
+        if (targetKeyword && type === 'cafe') {
+            const c = await scrapeCafeComments(normalized, targetKeyword);
+            commentMatchesCount = c.count;
+            commentSamples = c.samples;
+        }
+        if (targetKeyword && type === 'kin') {
+            const k = await scrapeKinAnswers(normalized, targetKeyword);
+            kinMatchesCount = k.count;
+            kinSamples = k.samples;
+        }
 
         // overallRank/rankInBlock은 최종 블록 순서 패스에서 부여 (여기선 placeholder)
         const post = {
@@ -221,6 +231,8 @@ async function scrapeIntegratedSearch(keyword, targetKeyword, userBlogId) {
             isUserBlog,
             commentMatchesCount,
             kinMatchesCount,
+            commentSamples,
+            kinSamples,
         };
 
         if (containsTarget) {
@@ -232,6 +244,8 @@ async function scrapeIntegratedSearch(keyword, targetKeyword, userBlogId) {
                 title: post.title,
                 commentMatchesCount,
                 kinMatchesCount,
+                commentSamples,
+                kinSamples,
             });
         }
         if (isUserBlog) {

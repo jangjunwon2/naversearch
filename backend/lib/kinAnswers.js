@@ -34,13 +34,31 @@ const ANSWER_CONTAINER_GROUPS = [
 // 별도 댓글 컨테이너(답변 영역 밖일 수 있는 댓글) — 있으면 추가 합산
 const COMMENT_SELECTORS = ['[class*="comment_area"]', '[class*="commentList"]', '.u_cbox_text'];
 
-// 지식인 답변/댓글 내 targetKeyword 출현 수를 반환
+// 키워드 주변 문맥 스니펫 추출 (최대 3개)
+function extractSnippets(text, keyword, max = 3, radius = 40) {
+    const snippets = [];
+    const lower = text.toLowerCase();
+    const k = keyword.toLowerCase();
+    let from = 0;
+    while (snippets.length < max) {
+        const idx = lower.indexOf(k, from);
+        if (idx === -1) break;
+        const s = Math.max(0, idx - radius);
+        const e = Math.min(text.length, idx + k.length + radius);
+        snippets.push((s > 0 ? '…' : '') + text.slice(s, e).replace(/\s+/g, ' ').trim() + (e < text.length ? '…' : ''));
+        from = idx + k.length;
+    }
+    return snippets;
+}
+
+// 지식인 답변/댓글 내 targetKeyword 출현 수 + 문맥 샘플 반환: { count, samples[] }
 async function scrapeKinAnswers(kinUrl, targetKeyword) {
-    if (!targetKeyword || !kinUrl) return 0;
+    const empty = { count: 0, samples: [] };
+    if (!targetKeyword || !kinUrl) return empty;
     try {
         const detailUrl = normalizeKinUrl(kinUrl);
         const response = await fetch(detailUrl, { headers: defaultHeaders() });
-        if (!response.ok) return 0;
+        if (!response.ok) return empty;
         const html = await response.text();
 
         const $ = cheerio.load(html);
@@ -73,10 +91,11 @@ async function scrapeKinAnswers(kinUrl, targetKeyword) {
             });
         });
 
-        return countOccurrences(answerText + ' ' + commentText, targetKeyword);
+        const combined = answerText + ' ' + commentText;
+        return { count: countOccurrences(combined, targetKeyword), samples: extractSnippets(combined, targetKeyword) };
     } catch (err) {
         console.error(`지식인 답글 수집 오류 (${kinUrl}):`, err.message);
-        return 0;
+        return empty;
     }
 }
 

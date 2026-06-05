@@ -248,6 +248,19 @@ function KeywordDetail({ keywordData, targetKeyword, blogId }) {
                           <a href={m.url} target="_blank" rel="noopener noreferrer" className="post-title-link" style={{ color: 'var(--color-text-primary)', fontSize: '0.85rem' }}>
                             {m.title} <ExternalLink size={12} style={{ flexShrink: 0 }} />
                           </a>
+                          {(() => {
+                            const samples = m.type === 'cafe' ? m.commentSamples : m.type === 'kin' ? m.kinSamples : null;
+                            if (!samples || samples.length === 0) return null;
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', marginTop: '0.2rem' }}>
+                                {samples.map((s, si) => (
+                                  <div key={si} style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', background: 'rgba(6,182,212,0.08)', padding: '0.25rem 0.5rem', borderRadius: '0.3rem' }}>
+                                    💬 {s}
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })()}
                         </div>
                       ))}
                     </div>

@@ -1,13 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Play, Square, Info } from 'lucide-react';
 import ScanProgress from './ScanProgress';
 import KeywordListControls from './KeywordListControls';
 
 // 기능2: ID별 순위 체크 입력 패널
-function IdScanPanel({ onStartScan, onCancelScan, isScanning, progress, currentKeyword, statusText }) {
+function IdScanPanel({ onStartScan, onCancelScan, isScanning, progress, currentKeyword, statusText, inject }) {
   const [keywordInput, setKeywordInput] = useState('광주 방탈출\n광주 방탈출 카페\n충장로 방탈출\n광주 데이트코스');
   const [userId, setUserId] = useState('cjh2748');
   const [maxPages, setMaxPages] = useState(5);
+
+  // 리서치 탭에서 키워드가 주입되면 입력란 교체
+  useEffect(() => {
+    if (inject?.text) setKeywordInput(inject.text);
+  }, [inject?.key]);
 
   const handleSubmit = (e) => {
     e.preventDefault();

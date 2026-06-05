@@ -45,6 +45,8 @@ async function enrichWithBlogStats(rows) {
         const volume = r.monthlyTotal || 0;
         // 포화지수(%) = 월간 발행량 ÷ 월간 검색량 × 100 (낮을수록 기회)
         const pct = volume > 0 ? Number(((monthlyPosts / volume) * 100).toFixed(1)) : null;
+        // 누적 경쟁률 = 블로그 총 문서수 ÷ 월간 검색량 (낮을수록 수요 대비 글 적음)
+        const blogPerSearch = volume > 0 ? Number((total / volume).toFixed(1)) : null;
         return {
             ...r,
             blogTotal: total,
@@ -52,6 +54,7 @@ async function enrichWithBlogStats(rows) {
             monthlySaturated,
             saturationPct: pct,
             saturationLabel: saturationLabel(pct),
+            blogPerSearch,
         };
     });
 }

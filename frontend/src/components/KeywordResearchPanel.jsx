@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Search, BarChart3, Copy, TrendingUp, AlertCircle, Save } from 'lucide-react';
+import { Search, BarChart3, Copy, TrendingUp, AlertCircle, Save, Download, ArrowRightCircle } from 'lucide-react';
 
 // 기능4: 키워드 리서치 — 검색광고 키워드도구 API (연관키워드 + 월간검색량 + 그래프)
-function KeywordResearchPanel() {
+// onSendToScan(mode, keywords[]): 선택 키워드를 업체명/ID 스캔 탭으로 전달
+function KeywordResearchPanel({ onSendToScan }) {
   const [seedInput, setSeedInput] = useState('광주 방탈출');
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -101,6 +102,46 @@ function KeywordResearchPanel() {
     }
   };
 
+  // 결과표 CSV 다운로드
+  const exportCsv = () => {
+    if (sorted.length === 0) return;
+    const header = ['키워드', 'PC검색수', '모바일검색수', '합계검색수', '블로그총수', '월발행량', '포화지수(%)', '포화라벨', '누적경쟁'];
+    const lines = [header.join(',')];
+    sorted.forEach((r) => {
+      lines.push(
+        [
+          '"' + r.keyword.replace(/"/g, '""') + '"',
+          r.monthlyPc,
+          r.monthlyMobile,
+          r.monthlyTotal,
+          r.blogTotal ?? '',
+          r.monthlyPosts == null ? '' : r.monthlyPosts + (r.monthlySaturated ? '+' : ''),
+          r.saturationPct ?? '',
+          r.saturationLabel ?? '',
+          r.blogPerSearch ?? '',
+        ].join(',')
+      );
+    });
+    const csv = '﻿' + lines.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '키워드리서치.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // 선택(없으면 전체) 키워드를 스캔 탭으로 전달
+  const sendToScan = (mode) => {
+    const kws = selected.size > 0 ? [...selected] : sorted.map((r) => r.keyword);
+    if (kws.length === 0) {
+      alert('보낼 키워드가 없습니다.');
+      return;
+    }
+    if (onSendToScan) onSendToScan(mode, kws);
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {/* 입력 */}
@@ -191,14 +232,23 @@ function KeywordResearchPanel() {
         <div className="glass-card">
           <div className="section-header" style={{ marginBottom: '1rem' }}>
             <h2 style={{ fontSize: '1.1rem' }}>연관 키워드 ({sorted.length}개)</h2>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <button type="button" className="btn-secondary" onClick={() => sendToScan('company')} title="선택(없으면 전체) 키워드로 업체명 스캔">
+                <ArrowRightCircle size={14} /> 업체명 스캔
+              </button>
+              <button type="button" className="btn-secondary" onClick={() => sendToScan('id')} title="선택(없으면 전체) 키워드로 ID 스캔">
+                <ArrowRightCircle size={14} /> ID 스캔
+              </button>
               {selected.size > 0 && (
                 <button type="button" className="btn-primary" style={{ width: 'auto', padding: '0 0.9rem' }} onClick={saveSelected}>
-                  <Save size={14} /> 선택 {selected.size}개 목록 저장
+                  <Save size={14} /> 선택 {selected.size}개 저장
                 </button>
               )}
+              <button type="button" className="btn-secondary" onClick={exportCsv}>
+                <Download size={14} /> CSV
+              </button>
               <button type="button" className="btn-secondary" onClick={copyKeywords}>
-                <Copy size={14} /> 전체 복사
+                <Copy size={14} /> 복사
               </button>
             </div>
           </div>
@@ -217,6 +267,7 @@ function KeywordResearchPanel() {
                   <SortableTh label="블로그 총수" k="blogTotal" sortKey={sortKey} setSortKey={setSortKey} />
                   <SortableTh label="월 발행량" k="monthlyPosts" sortKey={sortKey} setSortKey={setSortKey} />
                   <SortableTh label="포화지수" k="saturationPct" sortKey={sortKey} setSortKey={setSortKey} />
+                  <SortableTh label="누적경쟁" k="blogPerSearch" sortKey={sortKey} setSortKey={setSortKey} />
                 </tr>
               </thead>
               <tbody>
@@ -242,6 +293,7 @@ function KeywordResearchPanel() {
                         </span>
                       )}
                     </td>
+                    <td style={{ padding: '0.5rem', textAlign: 'right' }}>{r.blogPerSearch == null ? '—' : r.blogPerSearch.toLocaleString()}</td>
                   </tr>
                 ))}
               </tbody>

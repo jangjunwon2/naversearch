@@ -7,6 +7,7 @@ const path = require('path');
 
 const engine = require('./lib/scanEngine');
 const { createRateLimiter } = require('./lib/rateLimit');
+const { authMiddleware } = require('./lib/auth');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -21,6 +22,10 @@ app.use(express.static(path.join(__dirname, '../frontend/dist')));
 // 공개 배포 보호용 레이트리밋 (외부 API/스크래핑 남용 방지)
 const scanLimiter = createRateLimiter({ windowMs: 60000, max: 15, message: '스캔 요청이 많습니다. 잠시 후 다시 시도하세요.' });
 const keywordLimiter = createRateLimiter({ windowMs: 60000, max: 20, message: '키워드 조회가 많습니다. 잠시 후 다시 시도하세요.' });
+
+// ---- 인증 (APP_PASSWORD 설정 시에만 게이트 동작) ----
+app.use('/api/auth', require('./routes/auth')); // 인증 라우트는 게이트 이전(공개)
+app.use('/api', authMiddleware); // 이하 모든 /api 보호
 
 // ---- API 라우트 ----
 app.use('/api/scan/company', scanLimiter, require('./routes/companyScan')); // 기능1

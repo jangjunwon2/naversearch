@@ -3,6 +3,7 @@ import CompanyScanPanel from './components/CompanyScanPanel';
 import IdScanPanel from './components/IdScanPanel';
 import ForbiddenWordPanel from './components/ForbiddenWordPanel';
 import KeywordResearchPanel from './components/KeywordResearchPanel';
+import RankTrendPanel from './components/RankTrendPanel';
 import ResultsView from './components/ResultsView';
 import KeywordDetail from './components/KeywordDetail';
 import ScanHistory from './components/ScanHistory';
@@ -11,6 +12,7 @@ const TABS = [
   { key: 'company', label: '📢 업체명 체크' },
   { key: 'id', label: '📝 ID 순위' },
   { key: 'keywords', label: '🔑 키워드 리서치' },
+  { key: 'trend', label: '📈 순위 변동' },
   { key: 'forbidden', label: '🛡️ 금칙어 검사' },
   { key: 'history', label: '📅 히스토리' },
 ];
@@ -24,6 +26,10 @@ function App() {
   const [scanMode, setScanMode] = useState(null); // 'company' | 'id'
   const [scanCompanyName, setScanCompanyName] = useState('');
   const [scanUserId, setScanUserId] = useState('');
+
+  // 리서치 → 스캔 키워드 주입 ({ text, key })
+  const [injectCompany, setInjectCompany] = useState(null);
+  const [injectId, setInjectId] = useState(null);
 
   // 스캔 진행 상태
   const [isScanning, setIsScanning] = useState(false);
@@ -170,6 +176,18 @@ function App() {
     setActiveTab(mode === 'id' ? 'id' : 'company');
   };
 
+  // 리서치 탭에서 선택 키워드를 스캔 탭으로 주입 + 탭 전환
+  const handleSendToScan = (mode, keywords) => {
+    const text = keywords.join('\n');
+    if (mode === 'company') {
+      setInjectCompany({ text, key: Date.now() });
+      setActiveTab('company');
+    } else {
+      setInjectId({ text, key: Date.now() });
+      setActiveTab('id');
+    }
+  };
+
   const handleDeleteHistory = async (id) => {
     if (!confirm('정말 이 검색 기록을 삭제하시겠습니까?')) return;
     try {
@@ -201,6 +219,7 @@ function App() {
           progress={progress}
           currentKeyword={currentKeyword}
           statusText={statusText}
+          inject={tab === 'company' ? injectCompany : injectId}
         />
 
         <main className="content-area">
@@ -253,7 +272,12 @@ function App() {
       {activeTab === 'id' && renderScanTab('id')}
       {activeTab === 'keywords' && (
         <div className="content-area" style={{ marginTop: '0' }}>
-          <KeywordResearchPanel />
+          <KeywordResearchPanel onSendToScan={handleSendToScan} />
+        </div>
+      )}
+      {activeTab === 'trend' && (
+        <div className="content-area" style={{ marginTop: '0' }}>
+          <RankTrendPanel />
         </div>
       )}
       {activeTab === 'forbidden' && (
