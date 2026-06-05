@@ -13,7 +13,9 @@ function publicView(s) {
 router.get('/', (req, res) => res.json(publicView(engine.getSettings())));
 
 router.put('/', (req, res) => {
-    const next = engine.saveSettings(req.body || {});
+    // 내부 전용 필드(_digestLastSent)는 외부 입력으로 덮어쓰지 못하게 제외
+    const { _digestLastSent, ...body } = req.body || {};
+    const next = engine.saveSettings(body);
     res.json(publicView(next));
 });
 
