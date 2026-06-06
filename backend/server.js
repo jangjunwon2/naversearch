@@ -6,6 +6,7 @@ const corsMiddleware = require('cors');
 const path = require('path');
 
 const engine = require('./lib/scanEngine');
+const adplaceEngine = require('./lib/adplaceScanEngine');
 const { createRateLimiter } = require('./lib/rateLimit');
 const { authMiddleware } = require('./lib/auth');
 
@@ -30,6 +31,7 @@ app.use('/api', authMiddleware); // 이하 모든 /api 보호
 // ---- API 라우트 ----
 app.use('/api/scan/company', scanLimiter, require('./routes/companyScan')); // 기능1
 app.use('/api/scan/id', scanLimiter, require('./routes/idScan')); // 기능2
+app.use('/api/scan/adplace', scanLimiter, require('./routes/adplaceScan')); // 기능3: 파워링크·플레이스
 app.use('/api/forbidden', require('./routes/forbidden')); // 기능3
 app.use('/api/keywords', keywordLimiter, require('./routes/keywords')); // 키워드 리서치(검색광고 API)
 app.use('/api/keyword-lists', require('./routes/keywordLists')); // 검색어 목록 관리
@@ -37,10 +39,13 @@ app.use('/api/schedules', require('./routes/schedules')); // 자동 스캔 스�
 app.use('/api/notifications', require('./routes/notifications')); // 알림 설정
 app.use('/api', require('./routes/history')); // 히스토리/CSV export
 
-// ---- 공용 스캔 SSE 진행률 (기능1·2 공통) ----
+// ---- 공용 스캔 SSE 진행률 (기능1·2·3 공통) ----
 app.get('/api/scan/progress', (req, res) => {
     const scanId = req.query.scanId;
-    if (!scanId || !engine.hasScan(scanId)) {
+    const eng = engine.hasScan(scanId) ? engine
+               : adplaceEngine.hasScan(scanId) ? adplaceEngine
+               : null;
+    if (!scanId || !eng) {
         return res.status(404).end();
     }
 
@@ -48,11 +53,11 @@ app.get('/api/scan/progress', (req, res) => {
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
 
-    engine.attachClient(scanId, res);
-    const scan = engine.getScan(scanId);
+    eng.attachClient(scanId, res);
+    const scan = eng.getScan(scanId);
     res.write(`data: ${JSON.stringify({ type: 'init', total: scan.total })}\n\n`);
 
-    req.on('close', () => engine.detachClient(scanId));
+    req.on('close', () => eng.detachClient(scanId));
 });
 
 app.post('/api/scan/cancel', (req, res) => {
