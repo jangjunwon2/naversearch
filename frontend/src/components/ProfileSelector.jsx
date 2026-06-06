@@ -60,7 +60,7 @@ function ProfileSelector({ value, onSelect, onManage, disabled }) {
         <button
           type="button"
           disabled={disabled}
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => { setOpen((v) => !v); fetchProfiles(); }}
           style={{
             flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             padding: '6px 10px', borderRadius: '0.45rem',
@@ -90,10 +90,10 @@ function ProfileSelector({ value, onSelect, onManage, disabled }) {
       {/* 드롭다운 */}
       {open && (
         <div style={{
-          position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 200,
-          background: 'var(--bg-card, #1e293b)', border: '1px solid rgba(255,255,255,0.12)',
-          borderRadius: '0.5rem', boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
-          overflow: 'hidden',
+          position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 1000,
+          backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.15)',
+          borderRadius: '0.5rem', boxShadow: '0 12px 32px rgba(0,0,0,0.6)',
+          overflow: 'hidden', isolation: 'isolate',
         }}>
           {/* 빠른 생성 */}
           {creatingQuick ? (

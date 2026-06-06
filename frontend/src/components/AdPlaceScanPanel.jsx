@@ -1,6 +1,10 @@
 import React, { useState, useRef } from 'react';
+import { Save } from 'lucide-react';
 import ProfileSelector from './ProfileSelector';
 import ProfileManager from './ProfileManager';
+import QuickSaveProfileModal from './QuickSaveProfileModal';
+
+const PLACE_FIELD_LABELS = { businessName: '업체명', domain: '도메인', placeId: '플레이스 ID' };
 
 const PRESETS_KEY = 'adplace_kw_presets';
 
@@ -120,7 +124,9 @@ export default function AdPlaceScanPanel() {
   const [renamingPreset, setRenamingPreset] = useState(false);
   const [renameValue, setRenameValue] = useState('');
   const [profileId, setProfileId] = useState(null);
+  const [profileName, setProfileName] = useState('');
   const [showManager, setShowManager] = useState(false);
+  const [showSave, setShowSave] = useState(false);
   const esRef = useRef(null);
   const scanIdRef = useRef(null);
 
@@ -128,11 +134,17 @@ export default function AdPlaceScanPanel() {
 
   const handleProfileSelect = (profile) => {
     setProfileId(profile.id);
+    setProfileName(profile.displayName);
     setIdentifiers({
       name: profile.businessName || '',
       domain: profile.domain || '',
       placeId: profile.placeId || '',
     });
+  };
+
+  const handleSaved = (profile) => {
+    if (profile) { setProfileId(profile.id); setProfileName(profile.displayName); }
+    setShowSave(false);
   };
 
   // 프리셋
@@ -253,6 +265,16 @@ export default function AdPlaceScanPanel() {
     <>
       {showManager && <ProfileManager onClose={() => setShowManager(false)} />}
       {showSaveModal && <SavePresetModal onSave={handleSavePreset} onCancel={() => setShowSaveModal(false)} />}
+      {showSave && (
+        <QuickSaveProfileModal
+          profileId={profileId}
+          profileName={profileName}
+          values={{ businessName: identifiers.name.trim(), domain: identifiers.domain.trim(), placeId: identifiers.placeId.trim() }}
+          fieldLabels={PLACE_FIELD_LABELS}
+          onSaved={handleSaved}
+          onClose={() => setShowSave(false)}
+        />
+      )}
 
       <div className="app-grid">
         <aside className="sidebar">
@@ -272,9 +294,24 @@ export default function AdPlaceScanPanel() {
 
             {/* 업체명 */}
             <div className="form-group">
-              <label className="form-label">
-                업체명 <span style={{ color: '#ef4444' }}>*</span>
-              </label>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                <label className="form-label" style={{ marginBottom: 0 }}>
+                  업체명 <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowSave(true)}
+                  disabled={isScanning || !identifiers.name.trim()}
+                  style={{
+                    fontSize: '0.75em', padding: '2px 8px', borderRadius: 4,
+                    border: '1px solid rgba(99,102,241,0.35)', background: 'rgba(99,102,241,0.1)',
+                    color: '#a5b4fc', cursor: identifiers.name.trim() ? 'pointer' : 'not-allowed',
+                    display: 'flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap',
+                  }}
+                >
+                  <Save size={11} /> 프로필 저장
+                </button>
+              </div>
               <input
                 className="form-input"
                 type="text"

@@ -1,15 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Play, Square, Info } from 'lucide-react';
+import { Play, Square, Info, Save } from 'lucide-react';
 import ScanProgress from './ScanProgress';
 import KeywordListControls from './KeywordListControls';
 import ProfileSelector from './ProfileSelector';
 import ProfileManager from './ProfileManager';
+import QuickSaveProfileModal from './QuickSaveProfileModal';
+
+const FIELD_LABELS = { businessName: '업체명' };
 
 function CompanyScanPanel({ onStartScan, onCancelScan, isScanning, progress, currentKeyword, statusText, inject }) {
   const [keywordInput, setKeywordInput] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [profileId, setProfileId] = useState(null);
+  const [profileName, setProfileName] = useState('');
   const [showManager, setShowManager] = useState(false);
+  const [showSave, setShowSave] = useState(false);
 
   useEffect(() => {
     if (inject?.text) setKeywordInput(inject.text);
@@ -17,7 +22,16 @@ function CompanyScanPanel({ onStartScan, onCancelScan, isScanning, progress, cur
 
   const handleProfileSelect = (profile) => {
     setProfileId(profile.id);
+    setProfileName(profile.displayName);
     if (profile.businessName) setCompanyName(profile.businessName);
+  };
+
+  const handleSaved = (profile) => {
+    if (profile) {
+      setProfileId(profile.id);
+      setProfileName(profile.displayName);
+    }
+    setShowSave(false);
   };
 
   const handleSubmit = (e) => {
@@ -31,6 +45,16 @@ function CompanyScanPanel({ onStartScan, onCancelScan, isScanning, progress, cur
   return (
     <>
       {showManager && <ProfileManager onClose={() => setShowManager(false)} />}
+      {showSave && (
+        <QuickSaveProfileModal
+          profileId={profileId}
+          profileName={profileName}
+          values={{ businessName: companyName.trim() }}
+          fieldLabels={FIELD_LABELS}
+          onSaved={handleSaved}
+          onClose={() => setShowSave(false)}
+        />
+      )}
       <div className="glass-card">
         <h3 className="panel-title">📢 업체명 체크</h3>
         <p style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>
@@ -61,7 +85,22 @@ function CompanyScanPanel({ onStartScan, onCancelScan, isScanning, progress, cur
           <KeywordListControls keywordText={keywordInput} onLoadText={setKeywordInput} disabled={isScanning} />
 
           <div className="form-group">
-            <label htmlFor="companyName">업체명 / 브랜드명</label>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+              <label htmlFor="companyName" style={{ marginBottom: 0 }}>업체명 / 브랜드명</label>
+              <button
+                type="button"
+                onClick={() => setShowSave(true)}
+                disabled={isScanning || !companyName.trim()}
+                style={{
+                  fontSize: '0.75em', padding: '2px 8px', borderRadius: 4,
+                  border: '1px solid rgba(99,102,241,0.35)', background: 'rgba(99,102,241,0.1)',
+                  color: '#a5b4fc', cursor: companyName.trim() ? 'pointer' : 'not-allowed',
+                  display: 'flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap',
+                }}
+              >
+                <Save size={11} /> 프로필 저장
+              </button>
+            </div>
             <input
               id="companyName"
               type="text"
