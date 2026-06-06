@@ -30,19 +30,22 @@ function PowerLinkCell({ pl }) {
 
 function TabSearchResult({ tab }) {
   if (!tab) return null;
-  if (!tab.found) return <div style={{ fontSize: '0.82em', color: '#9ca3af', marginTop: 2 }}>플레이스 탭 미발견</div>;
+  if (!tab.found) return <div style={{ fontSize: '0.78em', color: '#9ca3af', marginTop: 3 }}>플레이스 탭 미발견</div>;
   return (
-    <div style={{ marginTop: 2 }}>
-      <div style={{ fontSize: '0.82em', color: '#6b7280' }}>
-        플레이스 탭 {tab.page}p {tab.position}번째
-        <span style={{ color: '#9ca3af', marginLeft: 4 }}>(유기 {tab.organicRank}위 / 전체 {tab.total ?? '?'}개)</span>
+    <div style={{ marginTop: 4 }}>
+      <div style={{ fontWeight: 700, fontSize: '0.97em', color: '#1d4ed8', lineHeight: 1.3 }}>
+        {tab.page}p {tab.position}번째
+        <span style={{ fontWeight: 400, fontSize: '0.78em', color: '#6b7280', marginLeft: 5 }}>플레이스 탭</span>
       </div>
       {tab.adPage != null && (
-        <div style={{ fontSize: '0.82em', color: '#92400e' }}>
-          광고 탭 {tab.adPage}p {tab.adPosition}번째
-          <span style={{ color: '#9ca3af', marginLeft: 4 }}>(광고 {tab.adRank}위)</span>
+        <div style={{ fontWeight: 700, fontSize: '0.97em', color: '#b45309', lineHeight: 1.3 }}>
+          {tab.adPage}p {tab.adPosition}번째
+          <span style={{ fontWeight: 400, fontSize: '0.78em', color: '#9ca3af', marginLeft: 5 }}>광고 탭</span>
         </div>
       )}
+      <div style={{ fontSize: '0.72em', color: '#9ca3af', marginTop: 2 }}>
+        유기 {tab.organicRank}위 · 전체 {tab.total ?? '?'}개
+      </div>
     </div>
   );
 }
@@ -87,6 +90,10 @@ function PlaceCell({ pl }) {
   );
 }
 
+function kwCount(text) {
+  return text ? text.split('\n').filter((l) => l.trim()).length : 0;
+}
+
 // 프리셋 저장 모달
 function SavePresetModal({ onSave, onCancel }) {
   const [name, setName] = useState('');
@@ -99,7 +106,7 @@ function SavePresetModal({ onSave, onCancel }) {
         background: '#fff', borderRadius: 10, padding: '24px 28px',
         minWidth: 280, boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
       }}>
-        <p style={{ fontWeight: 600, marginBottom: 12 }}>프리셋 이름</p>
+        <p style={{ fontWeight: 600, marginBottom: 12 }}>새 프리셋 이름</p>
         <input
           className="form-input"
           autoFocus
@@ -127,39 +134,53 @@ export default function AdPlaceScanPanel() {
   const [currentKeyword, setCurrentKeyword] = useState('');
   const [error, setError] = useState('');
   const [presets, setPresets] = useState(loadPresets);
+  const [activePreset, setActivePreset] = useState(null);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const esRef = useRef(null);
   const scanIdRef = useRef(null);
 
   const updateId = (field) => (e) => setIdentifiers((prev) => ({ ...prev, [field]: e.target.value }));
 
-  // 프리셋 저장
+  // 새 프리셋으로 저장
   const handleSavePreset = (presetName) => {
     const kws = keywordsText.trim();
     if (!kws) { setShowSaveModal(false); return; }
     const updated = [{ name: presetName, keywords: kws }, ...presets.filter(p => p.name !== presetName)];
     setPresets(updated);
     savePresets(updated);
+    setActivePreset(presetName);
     setShowSaveModal(false);
   };
 
-  // 프리셋 불러오기
-  const handleLoadPreset = (presetName) => {
-    const preset = presets.find(p => p.name === presetName);
-    if (preset) setKeywordsText(preset.keywords);
-  };
-
-  // 프리셋 삭제
-  const handleDeletePreset = (presetName, e) => {
-    e.stopPropagation();
-    const updated = presets.filter(p => p.name !== presetName);
+  // 현재 프리셋 덮어쓰기
+  const handleUpdatePreset = () => {
+    if (!activePreset || !keywordsText.trim()) return;
+    const updated = presets.map(p => p.name === activePreset ? { ...p, keywords: keywordsText.trim() } : p);
     setPresets(updated);
     savePresets(updated);
+  };
+
+  // 드롭다운에서 선택 → 즉시 불러오기
+  const handleSelectPreset = (presetName) => {
+    if (!presetName) return;
+    const preset = presets.find(p => p.name === presetName);
+    if (preset) { setKeywordsText(preset.keywords); setActivePreset(presetName); }
+  };
+
+  // 현재 프리셋 삭제
+  const handleDeleteActivePreset = () => {
+    if (!activePreset) return;
+    if (!window.confirm(`"${activePreset}" 프리셋을 삭제할까요?`)) return;
+    const updated = presets.filter(p => p.name !== activePreset);
+    setPresets(updated);
+    savePresets(updated);
+    setActivePreset(null);
   };
 
   const handleStart = async () => {
     const keywords = keywordsText.split('\n').map((k) => k.trim()).filter(Boolean);
     if (!keywords.length) return setError('키워드를 입력하세요.');
+    if (keywords.length > 500) return setError('키워드는 최대 500개까지 입력 가능합니다.');
     if (!identifiers.name.trim()) return setError('업체명은 필수입니다.');
     setError('');
     setResults([]);
@@ -241,60 +262,85 @@ export default function AdPlaceScanPanel() {
           <div className="form-group">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
               <label className="form-label" style={{ marginBottom: 0 }}>키워드 (줄바꿈으로 구분)</label>
-              <button
-                onClick={() => setShowSaveModal(true)}
-                disabled={isScanning || !keywordsText.trim()}
-                style={{
-                  fontSize: '0.75em', padding: '2px 8px', borderRadius: 4,
-                  border: '1px solid #d1d5db', background: '#f9fafb',
-                  cursor: keywordsText.trim() ? 'pointer' : 'not-allowed',
-                  color: '#374151',
-                }}
-              >
-                프리셋 저장
-              </button>
+              <span style={{
+                fontSize: '0.75em',
+                color: kwCount(keywordsText) > 500 ? '#ef4444' : '#9ca3af',
+              }}>
+                {kwCount(keywordsText)}/500개
+              </span>
             </div>
             <textarea
               className="form-textarea"
-              rows={5}
+              rows={6}
               value={keywordsText}
-              onChange={(e) => setKeywordsText(e.target.value)}
+              onChange={(e) => { setKeywordsText(e.target.value); setActivePreset(null); }}
               placeholder={'광주 방탈출\n이스케이프탑\n방탈출 광주'}
               disabled={isScanning}
             />
           </div>
 
-          {/* 저장된 프리셋 */}
-          {presets.length > 0 && (
-            <div style={{ marginBottom: 12 }}>
-              <p style={{ fontSize: '0.78em', color: '#6b7280', marginBottom: 5 }}>저장된 프리셋</p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+          {/* 프리셋 */}
+          <div className="form-group" style={{ marginBottom: 12 }}>
+            <label className="form-label" style={{ marginBottom: 5 }}>프리셋</label>
+            <div style={{ display: 'flex', gap: 5, marginBottom: 6 }}>
+              <select
+                value={activePreset || ''}
+                onChange={(e) => handleSelectPreset(e.target.value)}
+                disabled={isScanning}
+                style={{
+                  flex: 1, fontSize: '0.82em', padding: '4px 6px', borderRadius: 5,
+                  border: '1px solid #d1d5db', background: '#fff', color: '#374151',
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="">-- 불러오기 --</option>
                 {presets.map((p) => (
-                  <div
-                    key={p.name}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 3,
-                      padding: '3px 8px', borderRadius: 14,
-                      background: '#eff6ff', border: '1px solid #bfdbfe',
-                      cursor: 'pointer', fontSize: '0.78em',
-                    }}
-                    onClick={() => handleLoadPreset(p.name)}
-                  >
-                    <span style={{ color: '#1d4ed8' }}>{p.name}</span>
-                    <button
-                      onClick={(e) => handleDeletePreset(p.name, e)}
-                      style={{
-                        background: 'none', border: 'none', cursor: 'pointer',
-                        color: '#93c5fd', fontSize: '0.9em', padding: '0 1px',
-                        lineHeight: 1,
-                      }}
-                      title="삭제"
-                    >×</button>
-                  </div>
+                  <option key={p.name} value={p.name}>
+                    {p.name} ({kwCount(p.keywords)}개)
+                  </option>
                 ))}
-              </div>
+              </select>
+              {activePreset && (
+                <button
+                  onClick={handleUpdatePreset}
+                  disabled={isScanning || !keywordsText.trim()}
+                  title={`"${activePreset}"에 현재 키워드로 덮어씀`}
+                  style={{
+                    fontSize: '0.75em', padding: '4px 8px', borderRadius: 5,
+                    border: '1px solid #86efac', background: '#f0fdf4',
+                    color: '#15803d', cursor: 'pointer', whiteSpace: 'nowrap',
+                  }}
+                >업데이트</button>
+              )}
+              <button
+                onClick={() => setShowSaveModal(true)}
+                disabled={isScanning || !keywordsText.trim()}
+                style={{
+                  fontSize: '0.75em', padding: '4px 8px', borderRadius: 5,
+                  border: '1px solid #d1d5db', background: '#f9fafb',
+                  color: '#374151', cursor: keywordsText.trim() ? 'pointer' : 'not-allowed',
+                  whiteSpace: 'nowrap',
+                }}
+              >새 프리셋</button>
+              {activePreset && (
+                <button
+                  onClick={handleDeleteActivePreset}
+                  disabled={isScanning}
+                  title={`"${activePreset}" 삭제`}
+                  style={{
+                    fontSize: '0.75em', padding: '4px 7px', borderRadius: 5,
+                    border: '1px solid #fca5a5', background: '#fff5f5',
+                    color: '#dc2626', cursor: 'pointer',
+                  }}
+                >×</button>
+              )}
             </div>
-          )}
+            {activePreset && (
+              <p style={{ fontSize: '0.75em', color: '#6b7280', margin: 0 }}>
+                현재: <strong>{activePreset}</strong>
+              </p>
+            )}
+          </div>
 
           {/* 식별자 입력 */}
           <div className="form-group">
