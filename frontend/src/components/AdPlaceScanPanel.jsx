@@ -30,17 +30,29 @@ function PowerLinkCell({ pl }) {
 
 function PlaceCell({ pl }) {
   if (pl.exposed) {
+    const hasBoth = pl.adRank != null && pl.organicRank != null;
     return (
       <div>
-        <span style={{ color: rankColor(pl.rank), fontWeight: 'bold' }}>{pl.rank}위</span>
-        <span style={{
-          marginLeft: 6, fontSize: '0.75em', padding: '1px 5px', borderRadius: 3,
-          background: pl.isAd ? '#fef3c7' : '#e0f2fe',
-          color: pl.isAd ? '#92400e' : '#0369a1', fontWeight: 600,
-        }}>
-          {pl.isAd ? '광고' : '일반'}
-        </span>
-        <span style={{ color: '#9ca3af', fontWeight: 'normal', fontSize: '0.78em', marginLeft: 4 }}>
+        {hasBoth ? (
+          // 광고·일반 모두 노출
+          <span>
+            <span style={{ color: '#92400e', fontWeight: 'bold' }}>광고 {pl.adRank}위</span>
+            <span style={{ color: '#9ca3af', margin: '0 4px' }}>/</span>
+            <span style={{ color: rankColor(pl.organicRank), fontWeight: 'bold' }}>일반 {pl.organicRank}위</span>
+          </span>
+        ) : (
+          <span>
+            <span style={{ color: rankColor(pl.rank), fontWeight: 'bold' }}>{pl.rank}위</span>
+            <span style={{
+              marginLeft: 6, fontSize: '0.75em', padding: '1px 5px', borderRadius: 3,
+              background: pl.isAd ? '#fef3c7' : '#e0f2fe',
+              color: pl.isAd ? '#92400e' : '#0369a1', fontWeight: 600,
+            }}>
+              {pl.isAd ? '광고' : '일반'}
+            </span>
+          </span>
+        )}
+        <span style={{ color: '#9ca3af', fontWeight: 'normal', fontSize: '0.78em', marginLeft: 6 }}>
           (총 {pl.totalPlaces}개)
         </span>
       </div>
@@ -53,16 +65,22 @@ function PlaceCell({ pl }) {
       <div>
         <span style={{ color: '#9ca3af', fontSize: '0.85em' }}>미노출 (통합검색)</span>
         <div style={{ fontSize: '0.82em', marginTop: 2, color: '#6b7280' }}>
-          탭 {tab.page}페이지 {tab.position}번째
-          <span style={{ color: '#9ca3af', marginLeft: 4 }}>(전체 {tab.overallRank}위)</span>
+          일반 탭 {tab.page}페이지 {tab.position}번째
+          <span style={{ color: '#9ca3af', marginLeft: 4 }}>(유기 {tab.organicRank ?? tab.overallRank}위 / 전체 {tab.total ?? '?'}개)</span>
         </div>
+        {tab.adPage != null && (
+          <div style={{ fontSize: '0.82em', marginTop: 1, color: '#92400e' }}>
+            광고 탭 {tab.adPage}페이지 {tab.adPosition}번째
+            <span style={{ color: '#9ca3af', marginLeft: 4 }}>(광고 {tab.adRank}위)</span>
+          </div>
+        )}
       </div>
     );
   }
   return (
     <div>
       <span style={{ color: '#9ca3af', fontSize: '0.85em' }}>미노출 (통합검색)</span>
-      <div style={{ fontSize: '0.82em', marginTop: 2, color: '#9ca3af' }}>탭 5페이지 이내 미발견</div>
+      <div style={{ fontSize: '0.82em', marginTop: 2, color: '#9ca3af' }}>탭 미발견</div>
     </div>
   );
 }

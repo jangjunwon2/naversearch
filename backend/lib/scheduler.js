@@ -44,13 +44,23 @@ async function runSchedule(s) {
     }
 }
 
+function isDue(s, now) {
+    const last = s.lastRun ? new Date(s.lastRun).getTime() : 0;
+    // dailyHour 설정 + 하루 이상 주기 → 지정 시각에만 실행
+    if (s.dailyHour !== undefined && (s.intervalHours || 24) >= 24) {
+        const currentHour = new Date(now).getHours();
+        const msSince = now - last;
+        return currentHour === s.dailyHour && msSince >= 22 * 3600 * 1000;
+    }
+    const intervalMs = Math.max(s.intervalHours || 24, MIN_INTERVAL_HOURS) * 3600 * 1000;
+    return now - last >= intervalMs;
+}
+
 async function tick() {
     const now = Date.now();
     for (const s of store.getSchedules()) {
         if (!s.enabled || running.has(s.id)) continue;
-        const intervalMs = Math.max(s.intervalHours || 24, MIN_INTERVAL_HOURS) * 3600 * 1000;
-        const last = s.lastRun ? new Date(s.lastRun).getTime() : 0;
-        if (now - last >= intervalMs) {
+        if (isDue(s, now)) {
             console.log(`[스케줄러] 자동 스캔 실행: ${s.name || s.id}`);
             runSchedule(s); // await 안 함 — 여러 스케줄 병렬 허용
         }

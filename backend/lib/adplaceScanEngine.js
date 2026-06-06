@@ -48,21 +48,27 @@ function matchPowerLink(items, identifiers) {
   return null;
 }
 
-function matchPlace(items, identifiers) {
-  // 1패스: placeId 완전 일치 (최우선)
+// 전체 매칭 항목 반환 — 광고·일반 모두 수집 (같은 업체가 두 번 나오는 경우 대응)
+function matchAllPlaces(items, identifiers) {
+  const normTarget = normalize(identifiers.name);
+
   if (identifiers.placeId) {
-    for (const item of items) {
-      if (item.placeId === identifiers.placeId) return item;
-    }
+    const byId = items.filter((item) => item.placeId === identifiers.placeId);
+    if (byId.length > 0) return byId;
   }
-  // 2패스: 업체명 부분 일치
-  if (identifiers.name) {
-    const normName = normalize(identifiers.name);
-    for (const item of items) {
-      if (item.name && normalize(item.name).includes(normName)) return item;
-    }
+  if (normTarget) {
+    return items.filter((item) => {
+      if (!item.name) return false;
+      const n = normalize(item.name);
+      return n.includes(normTarget) || normTarget.includes(n);
+    });
   }
-  return null;
+  return [];
+}
+
+// 하위 호환 — 첫 번째 매칭 반환
+function matchPlace(items, identifiers) {
+  return matchAllPlaces(items, identifiers)[0] || null;
 }
 
 async function runScan(scanId, { keywords, identifiers }) {
@@ -85,11 +91,14 @@ async function runScan(scanId, { keywords, identifiers }) {
       try {
         const { powerLinkItems, placeItems } = await scrapeFullPage(keyword);
         const matchedPL = matchPowerLink(powerLinkItems, identifiers);
-        const matchedPlace = matchPlace(placeItems, identifiers);
+        const matchedPlaces = matchAllPlaces(placeItems, identifiers);
+        const adPlace = matchedPlaces.find((p) => p.isAd) || null;
+        const organicPlace = matchedPlaces.find((p) => !p.isAd) || null;
+        const bestPlace = adPlace || organicPlace;
 
         // 플레이스 미노출 시 탭 딥서치
         let tabSearch = null;
-        if (!matchedPlace) {
+        if (!bestPlace) {
           tabSearch = await scrapePlaceTab(keyword, identifiers, 3);
         }
 
@@ -98,9 +107,20 @@ async function runScan(scanId, { keywords, identifiers }) {
           powerLink: matchedPL
             ? { exposed: true, rank: matchedPL.rank, totalAds: powerLinkItems.length, title: matchedPL.title, url: matchedPL.url }
             : { exposed: false, rank: null, totalAds: powerLinkItems.length, title: null, url: null },
-          place: matchedPlace
-            ? { exposed: true, rank: matchedPlace.rank, totalPlaces: placeItems.length, name: matchedPlace.name, isAd: matchedPlace.isAd, rating: matchedPlace.rating, reviewCount: matchedPlace.reviewCount, tabSearch: null }
-            : { exposed: false, rank: null, totalPlaces: placeItems.length, name: null, isAd: false, rating: null, reviewCount: null, tabSearch },
+          place: bestPlace
+            ? {
+                exposed: true,
+                rank: bestPlace.rank,
+                adRank: adPlace?.rank ?? null,
+                organicRank: organicPlace?.rank ?? null,
+                totalPlaces: placeItems.length,
+                name: bestPlace.name,
+                isAd: bestPlace.isAd,
+                rating: bestPlace.rating,
+                reviewCount: bestPlace.reviewCount,
+                tabSearch: null,
+              }
+            : { exposed: false, rank: null, adRank: null, organicRank: null, totalPlaces: placeItems.length, name: null, isAd: false, rating: null, reviewCount: null, tabSearch },
         };
         sendSSE({ type: 'keyword_scanned', current: i + 1, total: keywords.length, keyword, result: keywordResult });
       } catch (err) {

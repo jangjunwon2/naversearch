@@ -17,17 +17,20 @@ function validate(body) {
     if (mode === 'company' && !String(body.companyName || '').trim()) return { error: '업체명이 필요합니다.' };
     if (mode === 'id' && !String(body.userId || '').trim()) return { error: '작성자 ID가 필요합니다.' };
     const intervalHours = Math.max(parseInt(body.intervalHours) || 24, MIN_INTERVAL_HOURS);
-    return {
-        value: {
-            mode,
-            keywords,
-            companyName: mode === 'company' ? String(body.companyName).trim() : '',
-            userId: mode === 'id' ? String(body.userId).trim() : '',
-            maxPages: parseInt(body.maxPages) || 5,
-            intervalHours,
-            name: String(body.name || '').trim() || `${mode === 'company' ? body.companyName : body.userId} (${keywords.length}개)`,
-        },
+    const dailyHourRaw = parseInt(body.dailyHour);
+    const dailyHour = (intervalHours >= 24 && !isNaN(dailyHourRaw) && dailyHourRaw >= 0 && dailyHourRaw <= 23)
+        ? dailyHourRaw : undefined;
+    const value = {
+        mode,
+        keywords,
+        companyName: mode === 'company' ? String(body.companyName).trim() : '',
+        userId: mode === 'id' ? String(body.userId).trim() : '',
+        maxPages: parseInt(body.maxPages) || 5,
+        intervalHours,
+        name: String(body.name || '').trim() || `${mode === 'company' ? body.companyName : body.userId} (${keywords.length}개)`,
     };
+    if (dailyHour !== undefined) value.dailyHour = dailyHour;
+    return { value };
 }
 
 router.get('/', (req, res) => res.json(store.getSchedules()));
