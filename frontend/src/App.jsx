@@ -7,6 +7,7 @@ import MarketingDashboard from './components/MarketingDashboard';
 import ResultsView from './components/ResultsView';
 import KeywordDetail from './components/KeywordDetail';
 import ScanHistory from './components/ScanHistory';
+import AdPlaceScanPanel from './components/AdPlaceScanPanel';
 
 const TABS = [
   { key: 'company', label: '📢 업체명 체크' },
@@ -14,6 +15,7 @@ const TABS = [
   { key: 'keywords', label: '🔑 키워드 리서치' },
   { key: 'trend', label: '📊 마케팅 대시보드' },
   { key: 'forbidden', label: '🛡️ 금칙어 검사' },
+  { key: 'adplace', label: '📍 광고·플레이스' },
   { key: 'history', label: '📅 히스토리' },
 ];
 
@@ -285,6 +287,7 @@ function App() {
           <ForbiddenWordPanel />
         </div>
       )}
+      {activeTab === 'adplace' && <AdPlaceScanPanel />}
       {activeTab === 'history' && (
         <div className="content-area" style={{ marginTop: '0' }}>
           <ScanHistory history={history} onLoadHistory={handleLoadHistory} onDeleteHistory={handleDeleteHistory} />
