@@ -7,7 +7,7 @@
     "setup": "npm install && cd frontend && npm install",
     "build": "cd frontend && npm install && npm run build",
     "start": "node backend/server.js",
-    "dev": "node backend/server.js",
+    "dev": "nodemon --watch backend backend/server.js",
     "test": "node --test backend/lib/__tests__/*.test.js"
   },
   "engines": {
@@ -25,5 +25,8 @@
     "cheerio": "^1.0.0",
     "cors": "^2.8.5",
     "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
   }
 }
