@@ -129,6 +129,8 @@ export default function AdPlaceScanPanel() {
   const [presets, setPresets] = useState(loadPresets);
   const [activePreset, setActivePreset] = useState(null);
   const [showSaveModal, setShowSaveModal] = useState(false);
+  const [renamingPreset, setRenamingPreset] = useState(false);
+  const [renameValue, setRenameValue] = useState('');
   const [savedIdentifiers, setSavedIdentifiers] = useState(loadSavedIdentifiers);
   const [historyNames, setHistoryNames] = useState([]);
   const esRef = useRef(null);
@@ -192,6 +194,20 @@ export default function AdPlaceScanPanel() {
     if (!presetName) return;
     const preset = presets.find(p => p.name === presetName);
     if (preset) { setKeywordsText(preset.keywords); setActivePreset(presetName); }
+  };
+
+  // 현재 프리셋 이름 변경
+  const handleRenamePreset = () => {
+    const newName = renameValue.trim();
+    if (!newName || !activePreset) { setRenamingPreset(false); return; }
+    if (presets.some(p => p.name === newName && p.name !== activePreset)) {
+      alert(`"${newName}" 이름의 프리셋이 이미 있습니다.`); return;
+    }
+    const updated = presets.map(p => p.name === activePreset ? { ...p, name: newName } : p);
+    setPresets(updated);
+    savePresets(updated);
+    setActivePreset(newName);
+    setRenamingPreset(false);
   };
 
   // 현재 프리셋 삭제
@@ -370,10 +386,34 @@ export default function AdPlaceScanPanel() {
                 >×</button>
               )}
             </div>
-            {activePreset && (
-              <p style={{ fontSize: '0.75em', color: '#6b7280', margin: 0 }}>
+            {activePreset && !renamingPreset && (
+              <p style={{ fontSize: '0.75em', color: '#6b7280', margin: 0, display: 'flex', alignItems: 'center', gap: 5 }}>
                 현재: <strong>{activePreset}</strong>
+                <button
+                  onClick={() => { setRenameValue(activePreset); setRenamingPreset(true); }}
+                  style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: '0.85em', padding: 0 }}
+                  title="프리셋 이름 변경"
+                >✏️</button>
               </p>
+            )}
+            {activePreset && renamingPreset && (
+              <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginTop: 2 }}>
+                <input
+                  autoFocus
+                  value={renameValue}
+                  onChange={(e) => setRenameValue(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleRenamePreset(); if (e.key === 'Escape') setRenamingPreset(false); }}
+                  style={{ flex: 1, fontSize: '0.82em', padding: '3px 7px', borderRadius: 4, border: '1px solid #93c5fd', outline: 'none' }}
+                />
+                <button
+                  onClick={handleRenamePreset}
+                  style={{ fontSize: '0.75em', padding: '3px 8px', borderRadius: 4, border: 'none', background: '#3b82f6', color: '#fff', cursor: 'pointer' }}
+                >확인</button>
+                <button
+                  onClick={() => setRenamingPreset(false)}
+                  style={{ fontSize: '0.75em', padding: '3px 7px', borderRadius: 4, border: '1px solid #d1d5db', background: '#f9fafb', color: '#6b7280', cursor: 'pointer' }}
+                >취소</button>
+              </div>
             )}
           </div>
 
