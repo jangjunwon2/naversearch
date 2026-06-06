@@ -1,20 +1,14 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
+import ProfileSelector from './ProfileSelector';
+import ProfileManager from './ProfileManager';
 
-const PRESETS_KEY      = 'adplace_kw_presets';
-const IDENTIFIERS_KEY  = 'adplace_identifiers';
+const PRESETS_KEY = 'adplace_kw_presets';
 
 function loadPresets() {
   try { return JSON.parse(localStorage.getItem(PRESETS_KEY) || '[]'); } catch { return []; }
 }
 function savePresets(presets) {
   localStorage.setItem(PRESETS_KEY, JSON.stringify(presets));
-}
-
-function loadSavedIdentifiers() {
-  try { return JSON.parse(localStorage.getItem(IDENTIFIERS_KEY) || '[]'); } catch { return []; }
-}
-function persistIdentifiers(list) {
-  localStorage.setItem(IDENTIFIERS_KEY, JSON.stringify(list));
 }
 
 function rankColor(rank) {
@@ -60,11 +54,7 @@ function TabSearchResult({ tab }) {
 
 function PlaceCell({ pl }) {
   const tab = pl.tabSearch;
-
-  // 탭 딥서치 발견: 탭 순위만 표시 (주요 정보)
   if (tab?.found) return <TabSearchResult tab={tab} />;
-
-  // 탭 미발견이지만 통합검색 노출
   if (pl.exposed) {
     return (
       <div>
@@ -73,8 +63,6 @@ function PlaceCell({ pl }) {
       </div>
     );
   }
-
-  // 탭 미발견 + 통합검색 미노출
   return (
     <div>
       <span style={{ color: '#9ca3af', fontSize: '0.82em' }}>통합검색 미노출</span>
@@ -87,7 +75,6 @@ function kwCount(text) {
   return text ? text.split('\n').filter((l) => l.trim()).length : 0;
 }
 
-// 프리셋 저장 모달
 function SavePresetModal({ onSave, onCancel }) {
   const [name, setName] = useState('');
   return (
@@ -96,10 +83,11 @@ function SavePresetModal({ onSave, onCancel }) {
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
       <div style={{
-        background: '#fff', borderRadius: 10, padding: '24px 28px',
-        minWidth: 280, boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+        background: 'var(--bg-card, #1e293b)', borderRadius: 10, padding: '24px 28px',
+        minWidth: 280, boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+        border: '1px solid rgba(255,255,255,0.1)',
       }}>
-        <p style={{ fontWeight: 600, marginBottom: 12 }}>새 프리셋 이름</p>
+        <p style={{ fontWeight: 600, marginBottom: 12 }}>새 키워드 프리셋 이름</p>
         <input
           className="form-input"
           autoFocus
@@ -110,8 +98,8 @@ function SavePresetModal({ onSave, onCancel }) {
           style={{ marginBottom: 16 }}
         />
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <button className="btn btn-secondary" onClick={onCancel} style={{ padding: '6px 14px' }}>취소</button>
-          <button className="btn btn-primary" onClick={() => name.trim() && onSave(name.trim())} style={{ padding: '6px 14px' }}>저장</button>
+          <button onClick={onCancel} style={{ padding: '6px 14px', borderRadius: 5, border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: 'var(--color-text-muted)', cursor: 'pointer' }}>취소</button>
+          <button onClick={() => name.trim() && onSave(name.trim())} style={{ padding: '6px 14px', borderRadius: 5, border: 'none', background: '#4f46e5', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>저장</button>
         </div>
       </div>
     </div>
@@ -131,60 +119,23 @@ export default function AdPlaceScanPanel() {
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [renamingPreset, setRenamingPreset] = useState(false);
   const [renameValue, setRenameValue] = useState('');
-  const [savedIdentifiers, setSavedIdentifiers] = useState(loadSavedIdentifiers);
-  const [historyNames, setHistoryNames] = useState([]);
+  const [profileId, setProfileId] = useState(null);
+  const [showManager, setShowManager] = useState(false);
   const esRef = useRef(null);
   const scanIdRef = useRef(null);
 
-  // 업체명 체크 히스토리에서 업체명 가져오기
-  useEffect(() => {
-    fetch('/api/history')
-      .then((r) => r.json())
-      .then((data) => {
-        const list = Array.isArray(data) ? data : (data.history || []);
-        const names = [...new Set(
-          list.filter((r) => r.companyName).map((r) => r.companyName)
-        )];
-        setHistoryNames(names);
-      })
-      .catch(() => {});
-  }, []);
-
   const updateId = (field) => (e) => setIdentifiers((prev) => ({ ...prev, [field]: e.target.value }));
 
-  // 드롭다운에서 업체 선택
-  const handleSelectIdentifier = (name) => {
-    if (!name) return;
-    const saved = savedIdentifiers.find((s) => s.name === name);
-    if (saved) {
-      setIdentifiers({ name: saved.name, domain: saved.domain || '', placeId: saved.placeId || '' });
-    } else {
-      setIdentifiers((prev) => ({ ...prev, name }));
-    }
+  const handleProfileSelect = (profile) => {
+    setProfileId(profile.id);
+    setIdentifiers({
+      name: profile.businessName || '',
+      domain: profile.domain || '',
+      placeId: profile.placeId || '',
+    });
   };
 
-  // 저장된 식별자 삭제
-  const handleDeleteIdentifier = (name, e) => {
-    e.stopPropagation();
-    const updated = savedIdentifiers.filter((s) => s.name !== name);
-    setSavedIdentifiers(updated);
-    persistIdentifiers(updated);
-  };
-
-  // 현재 식별자 명시적 저장
-  const handleSaveIdentifier = () => {
-    if (!identifiers.name.trim()) return;
-    const entry = {
-      name: identifiers.name.trim(),
-      domain: identifiers.domain.trim(),
-      placeId: identifiers.placeId.trim(),
-    };
-    const updated = [entry, ...savedIdentifiers.filter((s) => s.name !== entry.name)].slice(0, 30);
-    setSavedIdentifiers(updated);
-    persistIdentifiers(updated);
-  };
-
-  // 새 프리셋으로 저장
+  // 프리셋
   const handleSavePreset = (presetName) => {
     const kws = keywordsText.trim();
     if (!kws) { setShowSaveModal(false); return; }
@@ -195,7 +146,6 @@ export default function AdPlaceScanPanel() {
     setShowSaveModal(false);
   };
 
-  // 현재 프리셋 덮어쓰기
   const handleUpdatePreset = () => {
     if (!activePreset || !keywordsText.trim()) return;
     const updated = presets.map(p => p.name === activePreset ? { ...p, keywords: keywordsText.trim() } : p);
@@ -203,14 +153,12 @@ export default function AdPlaceScanPanel() {
     savePresets(updated);
   };
 
-  // 드롭다운에서 선택 → 즉시 불러오기
   const handleSelectPreset = (presetName) => {
     if (!presetName) return;
     const preset = presets.find(p => p.name === presetName);
     if (preset) { setKeywordsText(preset.keywords); setActivePreset(presetName); }
   };
 
-  // 현재 프리셋 이름 변경
   const handleRenamePreset = () => {
     const newName = renameValue.trim();
     if (!newName || !activePreset) { setRenamingPreset(false); return; }
@@ -224,7 +172,6 @@ export default function AdPlaceScanPanel() {
     setRenamingPreset(false);
   };
 
-  // 현재 프리셋 삭제
   const handleDeleteActivePreset = () => {
     if (!activePreset) return;
     if (!window.confirm(`"${activePreset}" 프리셋을 삭제할까요?`)) return;
@@ -243,14 +190,6 @@ export default function AdPlaceScanPanel() {
     setResults([]);
     setIsScanning(true);
     setProgress({ current: 0, total: keywords.length });
-
-    // 식별자 자동 저장
-    if (identifiers.name.trim()) {
-      const entry = { name: identifiers.name.trim(), domain: identifiers.domain.trim(), placeId: identifiers.placeId.trim() };
-      const updated = [entry, ...savedIdentifiers.filter((s) => s.name !== entry.name)];
-      setSavedIdentifiers(updated);
-      persistIdentifiers(updated);
-    }
 
     try {
       const res = await fetch('/api/scan/adplace', {
@@ -311,301 +250,215 @@ export default function AdPlaceScanPanel() {
   };
 
   return (
-    <div className="app-grid">
-      {showSaveModal && (
-        <SavePresetModal
-          onSave={handleSavePreset}
-          onCancel={() => setShowSaveModal(false)}
-        />
-      )}
+    <>
+      {showManager && <ProfileManager onClose={() => setShowManager(false)} />}
+      {showSaveModal && <SavePresetModal onSave={handleSavePreset} onCancel={() => setShowSaveModal(false)} />}
 
-      <aside className="sidebar">
-        <div className="panel-section">
-          <h2 className="panel-title">파워링크 · 플레이스 순위</h2>
+      <div className="app-grid">
+        <aside className="sidebar">
+          <div className="panel-section">
+            <h2 className="panel-title">파워링크 · 플레이스 순위</h2>
 
-          {/* 키워드 입력 */}
-          <div className="form-group">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-              <label className="form-label" style={{ marginBottom: 0 }}>키워드 (줄바꿈으로 구분)</label>
-              <span style={{
-                fontSize: '0.75em',
-                color: kwCount(keywordsText) > 500 ? '#ef4444' : '#9ca3af',
-              }}>
-                {kwCount(keywordsText)}/500개
-              </span>
-            </div>
-            <textarea
-              className="form-textarea"
-              rows={6}
-              value={keywordsText}
-              onChange={(e) => { setKeywordsText(e.target.value); setActivePreset(null); }}
-              placeholder={'광주 방탈출\n이스케이프탑\n방탈출 광주'}
-              disabled={isScanning}
-            />
-          </div>
-
-          {/* 프리셋 */}
-          <div className="form-group" style={{ marginBottom: 12 }}>
-            <label className="form-label" style={{ marginBottom: 5 }}>프리셋</label>
-            <div style={{ display: 'flex', gap: 5, marginBottom: 6 }}>
-              <select
-                value={activePreset || ''}
-                onChange={(e) => handleSelectPreset(e.target.value)}
+            {/* 업체 프로필 선택 */}
+            <div style={{ marginBottom: 14 }}>
+              <label className="form-label" style={{ marginBottom: 5, display: 'block', fontSize: '0.8em', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>대상 업체</label>
+              <ProfileSelector
+                value={profileId}
+                onSelect={handleProfileSelect}
+                onManage={() => setShowManager(true)}
                 disabled={isScanning}
-                style={{
-                  flex: 1, fontSize: '0.82em', padding: '4px 6px', borderRadius: 5,
-                  border: '1px solid #d1d5db', background: '#fff', color: '#374151',
-                  cursor: 'pointer',
-                }}
-              >
-                <option value="">-- 불러오기 --</option>
-                {presets.map((p) => (
-                  <option key={p.name} value={p.name}>
-                    {p.name} ({kwCount(p.keywords)}개)
-                  </option>
-                ))}
-              </select>
-              {activePreset && (
-                <button
-                  onClick={handleUpdatePreset}
-                  disabled={isScanning || !keywordsText.trim()}
-                  title={`"${activePreset}"에 현재 키워드로 덮어씀`}
-                  style={{
-                    fontSize: '0.75em', padding: '4px 8px', borderRadius: 5,
-                    border: '1px solid #86efac', background: '#f0fdf4',
-                    color: '#15803d', cursor: 'pointer', whiteSpace: 'nowrap',
-                  }}
-                >업데이트</button>
-              )}
-              <button
-                onClick={() => setShowSaveModal(true)}
-                disabled={isScanning || !keywordsText.trim()}
-                style={{
-                  fontSize: '0.75em', padding: '4px 8px', borderRadius: 5,
-                  border: '1px solid #d1d5db', background: '#f9fafb',
-                  color: '#374151', cursor: keywordsText.trim() ? 'pointer' : 'not-allowed',
-                  whiteSpace: 'nowrap',
-                }}
-              >새 프리셋</button>
-              {activePreset && (
-                <button
-                  onClick={handleDeleteActivePreset}
-                  disabled={isScanning}
-                  title={`"${activePreset}" 삭제`}
-                  style={{
-                    fontSize: '0.75em', padding: '4px 7px', borderRadius: 5,
-                    border: '1px solid #fca5a5', background: '#fff5f5',
-                    color: '#dc2626', cursor: 'pointer',
-                  }}
-                >×</button>
-              )}
+              />
             </div>
-            {activePreset && !renamingPreset && (
-              <p style={{ fontSize: '0.75em', color: '#6b7280', margin: 0, display: 'flex', alignItems: 'center', gap: 5 }}>
-                현재: <strong>{activePreset}</strong>
-                <button
-                  onClick={() => { setRenameValue(activePreset); setRenamingPreset(true); }}
-                  style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: '0.85em', padding: 0 }}
-                  title="프리셋 이름 변경"
-                >✏️</button>
-              </p>
-            )}
-            {activePreset && renamingPreset && (
-              <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginTop: 2 }}>
-                <input
-                  autoFocus
-                  value={renameValue}
-                  onChange={(e) => setRenameValue(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') handleRenamePreset(); if (e.key === 'Escape') setRenamingPreset(false); }}
-                  style={{ flex: 1, fontSize: '0.82em', padding: '3px 7px', borderRadius: 4, border: '1px solid #93c5fd', outline: 'none' }}
-                />
-                <button
-                  onClick={handleRenamePreset}
-                  style={{ fontSize: '0.75em', padding: '3px 8px', borderRadius: 4, border: 'none', background: '#3b82f6', color: '#fff', cursor: 'pointer' }}
-                >확인</button>
-                <button
-                  onClick={() => setRenamingPreset(false)}
-                  style={{ fontSize: '0.75em', padding: '3px 7px', borderRadius: 4, border: '1px solid #d1d5db', background: '#f9fafb', color: '#6b7280', cursor: 'pointer' }}
-                >취소</button>
-              </div>
-            )}
-          </div>
 
-          {/* 식별자 입력 */}
-          <div className="form-group">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-              <label className="form-label" style={{ marginBottom: 0 }}>
+            {/* 업체명 */}
+            <div className="form-group">
+              <label className="form-label">
                 업체명 <span style={{ color: '#ef4444' }}>*</span>
               </label>
-              <button
-                type="button"
-                onClick={handleSaveIdentifier}
-                disabled={isScanning || !identifiers.name.trim()}
-                style={{
-                  fontSize: '0.72em', padding: '2px 8px', borderRadius: 4,
-                  border: '1px solid #d1d5db', background: '#f9fafb',
-                  color: '#374151', cursor: identifiers.name.trim() ? 'pointer' : 'not-allowed',
-                  whiteSpace: 'nowrap',
-                }}
-                title="업체명·도메인·ID를 저장"
-              >💾 저장</button>
+              <input
+                className="form-input"
+                type="text"
+                value={identifiers.name}
+                onChange={updateId('name')}
+                placeholder="이스케이프탑"
+                disabled={isScanning}
+              />
+              <p style={{ fontSize: '0.75em', color: '#9ca3af', marginTop: 3, marginBottom: 0 }}>
+                이름 일부만 입력해도 포함 여부로 매칭됩니다
+              </p>
             </div>
 
-            {/* 저장된 업체 드롭다운 */}
-            {(savedIdentifiers.length > 0 || historyNames.length > 0) && (
-              <select
-                onChange={(e) => handleSelectIdentifier(e.target.value)}
-                value=""
+            <div className="form-group">
+              <label className="form-label">
+                도메인 <span style={{ color: '#9ca3af', fontSize: '0.8em' }}>(선택 · 파워링크 정확도 향상)</span>
+              </label>
+              <input
+                className="form-input"
+                type="text"
+                value={identifiers.domain}
+                onChange={updateId('domain')}
+                placeholder="example.com"
                 disabled={isScanning}
-                style={{
-                  width: '100%', fontSize: '0.82em', padding: '5px 6px',
-                  borderRadius: 5, border: '1px solid #d1d5db', background: '#fff',
-                  color: '#374151', cursor: 'pointer', marginBottom: 6,
-                }}
-              >
-                <option value="">-- 저장된 업체 선택 --</option>
-                {savedIdentifiers.map((s) => (
-                  <option key={s.name} value={s.name}>
-                    {s.name}{s.placeId ? ` · ID: ${s.placeId}` : ''}{s.domain ? ` · ${s.domain}` : ''}
-                  </option>
-                ))}
-                {historyNames
-                  .filter((n) => !savedIdentifiers.find((s) => s.name === n))
-                  .map((n) => (
-                    <option key={n} value={n}>{n} (업체명 체크 이력)</option>
-                  ))}
-              </select>
-            )}
+              />
+            </div>
 
-            <input
-              className="form-input"
-              type="text"
-              value={identifiers.name}
-              onChange={updateId('name')}
-              placeholder="이스케이프탑"
-              disabled={isScanning}
-            />
-            <p style={{ fontSize: '0.75em', color: '#9ca3af', marginTop: 3, marginBottom: 0 }}>
-              이름 일부만 입력해도 포함 여부로 매칭됩니다
-            </p>
+            <div className="form-group">
+              <label className="form-label">
+                플레이스 ID <span style={{ color: '#9ca3af', fontSize: '0.8em' }}>(선택 · 정확도 최고)</span>
+              </label>
+              <input
+                className="form-input"
+                type="text"
+                value={identifiers.placeId}
+                onChange={updateId('placeId')}
+                placeholder="37695692"
+                disabled={isScanning}
+              />
+              <p style={{ fontSize: '0.75em', color: '#9ca3af', marginTop: 3, marginBottom: 0 }}>
+                네이버 지도 → 업체 클릭 → URL의 숫자
+              </p>
+            </div>
 
-            {/* 저장된 업체 칩 (삭제 가능) */}
-            {savedIdentifiers.length > 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 7 }}>
-                {savedIdentifiers.map((s) => (
-                  <span
-                    key={s.name}
-                    style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 3,
-                      padding: '2px 7px', borderRadius: 12, fontSize: '0.72em',
-                      background: identifiers.name === s.name ? '#eff6ff' : '#f3f4f6',
-                      border: `1px solid ${identifiers.name === s.name ? '#bfdbfe' : '#e5e7eb'}`,
-                      color: identifiers.name === s.name ? '#1d4ed8' : '#6b7280',
-                    }}
-                  >
-                    {s.name}
-                    <button
-                      onClick={(e) => handleDeleteIdentifier(s.name, e)}
-                      style={{
-                        background: 'none', border: 'none', cursor: 'pointer',
-                        color: '#9ca3af', fontSize: '1em', padding: 0, lineHeight: 1,
-                      }}
-                      title="삭제"
-                    >×</button>
-                  </span>
-                ))}
+            {/* 키워드 입력 */}
+            <div className="form-group" style={{ marginTop: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                <label className="form-label" style={{ marginBottom: 0 }}>키워드 (줄바꿈으로 구분)</label>
+                <span style={{ fontSize: '0.75em', color: kwCount(keywordsText) > 500 ? '#ef4444' : '#9ca3af' }}>
+                  {kwCount(keywordsText)}/500개
+                </span>
               </div>
+              <textarea
+                className="form-textarea"
+                rows={6}
+                value={keywordsText}
+                onChange={(e) => { setKeywordsText(e.target.value); setActivePreset(null); }}
+                placeholder={'광주 방탈출\n이스케이프탑\n방탈출 광주'}
+                disabled={isScanning}
+              />
+            </div>
+
+            {/* 키워드 프리셋 */}
+            <div className="form-group" style={{ marginBottom: 12 }}>
+              <label className="form-label" style={{ marginBottom: 5 }}>키워드 프리셋</label>
+              <div style={{ display: 'flex', gap: 5, marginBottom: 6 }}>
+                <select
+                  value={activePreset || ''}
+                  onChange={(e) => handleSelectPreset(e.target.value)}
+                  disabled={isScanning}
+                  className="form-input"
+                  style={{ flex: 1, fontSize: '0.82em', padding: '4px 6px' }}
+                >
+                  <option value="">-- 불러오기 --</option>
+                  {presets.map((p) => (
+                    <option key={p.name} value={p.name}>
+                      {p.name} ({kwCount(p.keywords)}개)
+                    </option>
+                  ))}
+                </select>
+                {activePreset && (
+                  <button
+                    onClick={handleUpdatePreset}
+                    disabled={isScanning || !keywordsText.trim()}
+                    title={`"${activePreset}"에 현재 키워드로 덮어씀`}
+                    style={{ fontSize: '0.75em', padding: '4px 8px', borderRadius: 5, border: '1px solid rgba(134,239,172,0.4)', background: 'rgba(134,239,172,0.1)', color: '#6ee7b7', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                  >업데이트</button>
+                )}
+                <button
+                  onClick={() => setShowSaveModal(true)}
+                  disabled={isScanning || !keywordsText.trim()}
+                  style={{ fontSize: '0.75em', padding: '4px 8px', borderRadius: 5, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.05)', color: 'var(--color-text-secondary)', cursor: keywordsText.trim() ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap' }}
+                >새 프리셋</button>
+                {activePreset && (
+                  <button
+                    onClick={handleDeleteActivePreset}
+                    disabled={isScanning}
+                    title={`"${activePreset}" 삭제`}
+                    style={{ fontSize: '0.75em', padding: '4px 7px', borderRadius: 5, border: '1px solid rgba(252,165,165,0.3)', background: 'rgba(252,165,165,0.05)', color: '#ef4444', cursor: 'pointer' }}
+                  >×</button>
+                )}
+              </div>
+              {activePreset && !renamingPreset && (
+                <p style={{ fontSize: '0.75em', color: '#9ca3af', margin: 0, display: 'flex', alignItems: 'center', gap: 5 }}>
+                  현재: <strong>{activePreset}</strong>
+                  <button
+                    onClick={() => { setRenameValue(activePreset); setRenamingPreset(true); }}
+                    style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: '0.85em', padding: 0 }}
+                    title="프리셋 이름 변경"
+                  >✏️</button>
+                </p>
+              )}
+              {activePreset && renamingPreset && (
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginTop: 2 }}>
+                  <input
+                    autoFocus
+                    value={renameValue}
+                    onChange={(e) => setRenameValue(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleRenamePreset(); if (e.key === 'Escape') setRenamingPreset(false); }}
+                    className="form-input"
+                    style={{ flex: 1, fontSize: '0.82em', padding: '3px 7px' }}
+                  />
+                  <button onClick={handleRenamePreset} style={{ fontSize: '0.75em', padding: '3px 8px', borderRadius: 4, border: 'none', background: '#4f46e5', color: '#fff', cursor: 'pointer' }}>확인</button>
+                  <button onClick={() => setRenamingPreset(false)} style={{ fontSize: '0.75em', padding: '3px 7px', borderRadius: 4, border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: 'var(--color-text-muted)', cursor: 'pointer' }}>취소</button>
+                </div>
+              )}
+            </div>
+
+            {error && (
+              <p style={{ color: '#ef4444', fontSize: '0.85rem', marginBottom: '8px' }}>{error}</p>
+            )}
+
+            {isScanning ? (
+              <>
+                <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>
+                  {progress.current}/{progress.total} · {currentKeyword}
+                </p>
+                <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '8px' }}>
+                  미노출 시 플레이스 탭 딥서치로 추가 시간 소요
+                </p>
+                <button className="btn-danger" style={{ width: '100%', padding: '0.6rem', borderRadius: 6, border: 'none', cursor: 'pointer' }} onClick={handleCancel}>스캔 중단</button>
+              </>
+            ) : (
+              <button className="btn-primary" onClick={handleStart}>스캔 시작</button>
             )}
           </div>
+        </aside>
 
-          <div className="form-group">
-            <label className="form-label">
-              도메인{' '}
-              <span style={{ color: '#9ca3af', fontSize: '0.8em' }}>(선택 · 파워링크 정확도 향상)</span>
-            </label>
-            <input
-              className="form-input"
-              type="text"
-              value={identifiers.domain}
-              onChange={updateId('domain')}
-              placeholder="example.com"
-              disabled={isScanning}
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">
-              플레이스 ID{' '}
-              <span style={{ color: '#9ca3af', fontSize: '0.8em' }}>(선택 · 정확도 최고)</span>
-            </label>
-            <input
-              className="form-input"
-              type="text"
-              value={identifiers.placeId}
-              onChange={updateId('placeId')}
-              placeholder="37695692"
-              disabled={isScanning}
-            />
-            <p style={{ fontSize: '0.75em', color: '#9ca3af', marginTop: 3, marginBottom: 0 }}>
-              네이버 지도 → 업체 클릭 → URL의 숫자
-            </p>
-          </div>
-
-          {error && (
-            <p style={{ color: '#ef4444', fontSize: '0.85rem', marginBottom: '8px' }}>{error}</p>
-          )}
-
-          {isScanning ? (
-            <>
-              <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '6px' }}>
-                {progress.current}/{progress.total} · {currentKeyword}
-              </p>
-              <p style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '8px' }}>
-                미노출 시 플레이스 탭 딥서치로 추가 시간 소요
-              </p>
-              <button className="btn btn-danger" onClick={handleCancel}>스캔 중단</button>
-            </>
-          ) : (
-            <button className="btn btn-primary" onClick={handleStart}>스캔 시작</button>
-          )}
-        </div>
-      </aside>
-
-      <main className="content-area">
-        {results.length > 0 ? (
-          <div className="results-panel">
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
-              <thead>
-                <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
-                  <th style={{ textAlign: 'left', padding: '10px 12px', width: '32%' }}>키워드</th>
-                  <th style={{ textAlign: 'center', padding: '10px 12px', width: '22%' }}>파워링크</th>
-                  <th style={{ textAlign: 'left', padding: '10px 12px', width: '46%' }}>플레이스</th>
-                </tr>
-              </thead>
-              <tbody>
-                {results.map((r, i) => (
-                  <tr key={i} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                    <td style={{ padding: '10px 12px', fontWeight: '500' }}>{r.keyword}</td>
-                    <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                      <PowerLinkCell pl={r.powerLink} />
-                    </td>
-                    <td style={{ padding: '10px 12px' }}>
-                      <PlaceCell pl={r.place} />
-                    </td>
+        <main className="content-area">
+          {results.length > 0 ? (
+            <div className="results-panel">
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.1)' }}>
+                    <th style={{ textAlign: 'left', padding: '10px 12px', width: '32%' }}>키워드</th>
+                    <th style={{ textAlign: 'center', padding: '10px 12px', width: '22%' }}>파워링크</th>
+                    <th style={{ textAlign: 'left', padding: '10px 12px', width: '46%' }}>플레이스</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div style={{ textAlign: 'center', color: '#9ca3af', marginTop: '6rem' }}>
-            <p>키워드와 업체 정보를 입력하고 스캔을 시작하세요.</p>
-            <p style={{ fontSize: '0.82em', marginTop: '6px' }}>
-              통합검색 플레이스 블록 + 미노출 시 플레이스 탭 딥서치
-            </p>
-          </div>
-        )}
-      </main>
-    </div>
+                </thead>
+                <tbody>
+                  {results.map((r, i) => (
+                    <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <td style={{ padding: '10px 12px', fontWeight: '500' }}>{r.keyword}</td>
+                      <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                        <PowerLinkCell pl={r.powerLink} />
+                      </td>
+                      <td style={{ padding: '10px 12px' }}>
+                        <PlaceCell pl={r.place} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', color: 'var(--color-text-muted)', marginTop: '6rem' }}>
+              <p>키워드와 업체 정보를 입력하고 스캔을 시작하세요.</p>
+              <p style={{ fontSize: '0.82em', marginTop: '6px' }}>
+                통합검색 플레이스 블록 + 미노출 시 플레이스 탭 딥서치
+              </p>
+            </div>
+          )}
+        </main>
+      </div>
+    </>
   );
 }

@@ -8,6 +8,7 @@ const FORBIDDEN_FILE = path.join(STORE_DIR, 'forbidden-words.json');
 const KEYWORD_LISTS_FILE = path.join(STORE_DIR, 'keyword-lists.json');
 const SCHEDULES_FILE = path.join(STORE_DIR, 'schedules.json');
 const NOTIFICATIONS_FILE = path.join(STORE_DIR, 'notifications.json');
+const PROFILES_FILE = path.join(STORE_DIR, 'profiles.json');
 const LEGACY_HISTORY = path.join(__dirname, '..', '..', 'scan_history.json');
 
 const MAX_HISTORY = 50;
@@ -105,6 +106,16 @@ function saveNotifications(obj) {
     return obj;
 }
 
+// ---- 대상 프로필 ----
+function getProfiles() {
+    return readJson(PROFILES_FILE, []);
+}
+
+function saveProfiles(list) {
+    writeJson(PROFILES_FILE, list);
+    return list;
+}
+
 ensureStore();
 
 module.exports = {
@@ -119,4 +130,6 @@ module.exports = {
     saveSchedules,
     getNotifications,
     saveNotifications,
+    getProfiles,
+    saveProfiles,
 };

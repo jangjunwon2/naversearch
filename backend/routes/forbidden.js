@@ -75,6 +75,29 @@ router.delete('/words/:id', (req, res) => {
     res.json({ success: true, words: list });
 });
 
+// 전체 삭제
+router.delete('/words', (req, res) => {
+    store.saveForbiddenWords([]);
+    res.json({ success: true, words: [] });
+});
+
+// 페이지네이션·검색 지원 조회 (count-only 모드)
+router.get('/words/count', (req, res) => {
+    res.json({ count: store.getForbiddenWords().length });
+});
+
+// 페이지네이션 조회
+router.get('/words/page', (req, res) => {
+    const q = (req.query.q || '').toLowerCase();
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(200, Math.max(10, parseInt(req.query.limit) || 100));
+    const all = store.getForbiddenWords();
+    const filtered = q ? all.filter((w) => w.word.toLowerCase().includes(q)) : all;
+    const total = filtered.length;
+    const items = filtered.slice((page - 1) * limit, page * limit);
+    res.json({ items, total, page, limit, pages: Math.ceil(total / limit) });
+});
+
 router.post('/check', (req, res) => {
     const { text } = req.body;
     if (typeof text !== 'string') {
