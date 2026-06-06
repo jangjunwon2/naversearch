@@ -1,12 +1,20 @@
 import React, { useState, useRef, useEffect } from 'react';
 
-const PRESETS_KEY = 'adplace_kw_presets';
+const PRESETS_KEY      = 'adplace_kw_presets';
+const IDENTIFIERS_KEY  = 'adplace_identifiers';
 
 function loadPresets() {
   try { return JSON.parse(localStorage.getItem(PRESETS_KEY) || '[]'); } catch { return []; }
 }
 function savePresets(presets) {
   localStorage.setItem(PRESETS_KEY, JSON.stringify(presets));
+}
+
+function loadSavedIdentifiers() {
+  try { return JSON.parse(localStorage.getItem(IDENTIFIERS_KEY) || '[]'); } catch { return []; }
+}
+function persistIdentifiers(list) {
+  localStorage.setItem(IDENTIFIERS_KEY, JSON.stringify(list));
 }
 
 function rankColor(rank) {
@@ -51,41 +59,26 @@ function TabSearchResult({ tab }) {
 }
 
 function PlaceCell({ pl }) {
+  const tab = pl.tabSearch;
+
+  // 탭 딥서치 발견: 탭 순위만 표시 (주요 정보)
+  if (tab?.found) return <TabSearchResult tab={tab} />;
+
+  // 탭 미발견이지만 통합검색 노출
   if (pl.exposed) {
-    const hasBoth = pl.adRank != null && pl.organicRank != null;
     return (
       <div>
-        {hasBoth ? (
-          <span>
-            <span style={{ color: '#92400e', fontWeight: 'bold' }}>광고 {pl.adRank}위</span>
-            <span style={{ color: '#9ca3af', margin: '0 4px' }}>/</span>
-            <span style={{ color: rankColor(pl.organicRank), fontWeight: 'bold' }}>일반 {pl.organicRank}위</span>
-          </span>
-        ) : (
-          <span>
-            <span style={{ color: rankColor(pl.rank), fontWeight: 'bold' }}>{pl.rank}위</span>
-            <span style={{
-              marginLeft: 6, fontSize: '0.75em', padding: '1px 5px', borderRadius: 3,
-              background: pl.isAd ? '#fef3c7' : '#e0f2fe',
-              color: pl.isAd ? '#92400e' : '#0369a1', fontWeight: 600,
-            }}>
-              {pl.isAd ? '광고' : '일반'}
-            </span>
-          </span>
-        )}
-        <span style={{ color: '#9ca3af', fontWeight: 'normal', fontSize: '0.78em', marginLeft: 6 }}>
-          (총 {pl.totalPlaces}개)
-        </span>
-        <TabSearchResult tab={pl.tabSearch} />
+        <span style={{ fontSize: '0.82em', color: '#6b7280' }}>통합검색 노출</span>
+        <div style={{ fontSize: '0.75em', color: '#9ca3af', marginTop: 2 }}>플레이스 탭 미발견</div>
       </div>
     );
   }
-  const tab = pl.tabSearch;
-  if (!tab) return <span style={{ color: '#9ca3af', fontSize: '0.85em' }}>미노출</span>;
+
+  // 탭 미발견 + 통합검색 미노출
   return (
     <div>
-      <span style={{ color: '#9ca3af', fontSize: '0.85em' }}>통합검색 미노출</span>
-      <TabSearchResult tab={tab} />
+      <span style={{ color: '#9ca3af', fontSize: '0.82em' }}>통합검색 미노출</span>
+      <div style={{ fontSize: '0.75em', color: '#9ca3af', marginTop: 2 }}>플레이스 탭 미발견</div>
     </div>
   );
 }
@@ -136,10 +129,44 @@ export default function AdPlaceScanPanel() {
   const [presets, setPresets] = useState(loadPresets);
   const [activePreset, setActivePreset] = useState(null);
   const [showSaveModal, setShowSaveModal] = useState(false);
+  const [savedIdentifiers, setSavedIdentifiers] = useState(loadSavedIdentifiers);
+  const [historyNames, setHistoryNames] = useState([]);
   const esRef = useRef(null);
   const scanIdRef = useRef(null);
 
+  // 업체명 체크 히스토리에서 업체명 가져오기
+  useEffect(() => {
+    fetch('/api/history')
+      .then((r) => r.json())
+      .then((data) => {
+        const names = [...new Set(
+          (data.history || []).filter((r) => r.companyName).map((r) => r.companyName)
+        )];
+        setHistoryNames(names);
+      })
+      .catch(() => {});
+  }, []);
+
   const updateId = (field) => (e) => setIdentifiers((prev) => ({ ...prev, [field]: e.target.value }));
+
+  // 드롭다운에서 업체 선택
+  const handleSelectIdentifier = (name) => {
+    if (!name) return;
+    const saved = savedIdentifiers.find((s) => s.name === name);
+    if (saved) {
+      setIdentifiers({ name: saved.name, domain: saved.domain || '', placeId: saved.placeId || '' });
+    } else {
+      setIdentifiers((prev) => ({ ...prev, name }));
+    }
+  };
+
+  // 저장된 식별자 삭제
+  const handleDeleteIdentifier = (name, e) => {
+    e.stopPropagation();
+    const updated = savedIdentifiers.filter((s) => s.name !== name);
+    setSavedIdentifiers(updated);
+    persistIdentifiers(updated);
+  };
 
   // 새 프리셋으로 저장
   const handleSavePreset = (presetName) => {
@@ -186,6 +213,14 @@ export default function AdPlaceScanPanel() {
     setResults([]);
     setIsScanning(true);
     setProgress({ current: 0, total: keywords.length });
+
+    // 식별자 자동 저장
+    if (identifiers.name.trim()) {
+      const entry = { name: identifiers.name.trim(), domain: identifiers.domain.trim(), placeId: identifiers.placeId.trim() };
+      const updated = [entry, ...savedIdentifiers.filter((s) => s.name !== entry.name)];
+      setSavedIdentifiers(updated);
+      persistIdentifiers(updated);
+    }
 
     try {
       const res = await fetch('/api/scan/adplace', {
@@ -347,6 +382,33 @@ export default function AdPlaceScanPanel() {
             <label className="form-label">
               업체명 <span style={{ color: '#ef4444' }}>*</span>
             </label>
+
+            {/* 저장된 업체 드롭다운 */}
+            {(savedIdentifiers.length > 0 || historyNames.length > 0) && (
+              <select
+                onChange={(e) => handleSelectIdentifier(e.target.value)}
+                value=""
+                disabled={isScanning}
+                style={{
+                  width: '100%', fontSize: '0.82em', padding: '5px 6px',
+                  borderRadius: 5, border: '1px solid #d1d5db', background: '#fff',
+                  color: '#374151', cursor: 'pointer', marginBottom: 6,
+                }}
+              >
+                <option value="">-- 저장된 업체 선택 --</option>
+                {savedIdentifiers.map((s) => (
+                  <option key={s.name} value={s.name}>
+                    {s.name}{s.placeId ? ` · ID: ${s.placeId}` : ''}{s.domain ? ` · ${s.domain}` : ''}
+                  </option>
+                ))}
+                {historyNames
+                  .filter((n) => !savedIdentifiers.find((s) => s.name === n))
+                  .map((n) => (
+                    <option key={n} value={n}>{n} (업체명 체크 이력)</option>
+                  ))}
+              </select>
+            )}
+
             <input
               className="form-input"
               type="text"
@@ -358,6 +420,34 @@ export default function AdPlaceScanPanel() {
             <p style={{ fontSize: '0.75em', color: '#9ca3af', marginTop: 3, marginBottom: 0 }}>
               이름 일부만 입력해도 포함 여부로 매칭됩니다
             </p>
+
+            {/* 저장된 업체 칩 (삭제 가능) */}
+            {savedIdentifiers.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 7 }}>
+                {savedIdentifiers.map((s) => (
+                  <span
+                    key={s.name}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 3,
+                      padding: '2px 7px', borderRadius: 12, fontSize: '0.72em',
+                      background: identifiers.name === s.name ? '#eff6ff' : '#f3f4f6',
+                      border: `1px solid ${identifiers.name === s.name ? '#bfdbfe' : '#e5e7eb'}`,
+                      color: identifiers.name === s.name ? '#1d4ed8' : '#6b7280',
+                    }}
+                  >
+                    {s.name}
+                    <button
+                      onClick={(e) => handleDeleteIdentifier(s.name, e)}
+                      style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: '#9ca3af', fontSize: '1em', padding: 0, lineHeight: 1,
+                      }}
+                      title="삭제"
+                    >×</button>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="form-group">
