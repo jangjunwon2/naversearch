@@ -35,6 +35,14 @@ function IdScanPanel({ onStartScan, onCancelScan, isScanning, progress, currentK
     persistIds(savedIds.filter((i) => i.userId !== uid));
   };
 
+  const handleSaveId = () => {
+    const uid = userId.trim();
+    if (!uid) return;
+    const pages = parseInt(maxPages) || 5;
+    const entry = { userId: uid, maxPages: pages };
+    persistIds([entry, ...savedIds.filter((i) => i.userId !== uid)].slice(0, 30));
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     const keywords = keywordInput.split('\n').map((k) => k.trim()).filter(Boolean);
@@ -71,7 +79,16 @@ function IdScanPanel({ onStartScan, onCancelScan, isScanning, progress, currentK
         <KeywordListControls keywordText={keywordInput} onLoadText={setKeywordInput} disabled={isScanning} />
 
         <div className="form-group">
-          <label htmlFor="userId">작성자 ID</label>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+            <label htmlFor="userId" style={{ marginBottom: 0 }}>작성자 ID</label>
+            <button
+              type="button"
+              onClick={handleSaveId}
+              disabled={isScanning || !userId.trim()}
+              style={{ fontSize: '0.75em', padding: '2px 8px', borderRadius: 4, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.07)', color: 'var(--color-text-muted)', cursor: userId.trim() ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap' }}
+              title="작성자 ID 저장"
+            >💾 저장</button>
+          </div>
 
           {savedIds.length > 0 && (
             <select

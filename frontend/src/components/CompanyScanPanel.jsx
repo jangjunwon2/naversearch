@@ -32,6 +32,12 @@ function CompanyScanPanel({ onStartScan, onCancelScan, isScanning, progress, cur
     persistNames(savedNames.filter((n) => n !== name));
   };
 
+  const handleSaveName = () => {
+    const name = companyName.trim();
+    if (!name) return;
+    if (!savedNames.includes(name)) persistNames([name, ...savedNames].slice(0, 30));
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     const keywords = keywordInput.split('\n').map((k) => k.trim()).filter(Boolean);
@@ -66,7 +72,16 @@ function CompanyScanPanel({ onStartScan, onCancelScan, isScanning, progress, cur
         <KeywordListControls keywordText={keywordInput} onLoadText={setKeywordInput} disabled={isScanning} />
 
         <div className="form-group">
-          <label htmlFor="companyName">업체명 / 브랜드명</label>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+            <label htmlFor="companyName" style={{ marginBottom: 0 }}>업체명 / 브랜드명</label>
+            <button
+              type="button"
+              onClick={handleSaveName}
+              disabled={isScanning || !companyName.trim()}
+              style={{ fontSize: '0.75em', padding: '2px 8px', borderRadius: 4, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.07)', color: 'var(--color-text-muted)', cursor: companyName.trim() ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap' }}
+              title="업체명 저장"
+            >💾 저장</button>
+          </div>
 
           {savedNames.length > 0 && (
             <select

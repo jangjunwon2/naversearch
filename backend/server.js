@@ -62,7 +62,7 @@ app.get('/api/scan/progress', (req, res) => {
 
 app.post('/api/scan/cancel', (req, res) => {
     const { scanId } = req.body;
-    if (engine.cancelScan(scanId)) {
+    if (engine.cancelScan(scanId) || adplaceEngine.cancelScan(scanId)) {
         res.json({ success: true, message: '스캔이 중단되었습니다.' });
     } else {
         res.status(404).json({ error: 'Scan ID를 찾을 수 없습니다.' });

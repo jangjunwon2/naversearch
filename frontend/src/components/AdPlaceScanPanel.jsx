@@ -141,8 +141,9 @@ export default function AdPlaceScanPanel() {
     fetch('/api/history')
       .then((r) => r.json())
       .then((data) => {
+        const list = Array.isArray(data) ? data : (data.history || []);
         const names = [...new Set(
-          (data.history || []).filter((r) => r.companyName).map((r) => r.companyName)
+          list.filter((r) => r.companyName).map((r) => r.companyName)
         )];
         setHistoryNames(names);
       })
@@ -166,6 +167,19 @@ export default function AdPlaceScanPanel() {
   const handleDeleteIdentifier = (name, e) => {
     e.stopPropagation();
     const updated = savedIdentifiers.filter((s) => s.name !== name);
+    setSavedIdentifiers(updated);
+    persistIdentifiers(updated);
+  };
+
+  // 현재 식별자 명시적 저장
+  const handleSaveIdentifier = () => {
+    if (!identifiers.name.trim()) return;
+    const entry = {
+      name: identifiers.name.trim(),
+      domain: identifiers.domain.trim(),
+      placeId: identifiers.placeId.trim(),
+    };
+    const updated = [entry, ...savedIdentifiers.filter((s) => s.name !== entry.name)].slice(0, 30);
     setSavedIdentifiers(updated);
     persistIdentifiers(updated);
   };
@@ -419,9 +433,23 @@ export default function AdPlaceScanPanel() {
 
           {/* 식별자 입력 */}
           <div className="form-group">
-            <label className="form-label">
-              업체명 <span style={{ color: '#ef4444' }}>*</span>
-            </label>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+              <label className="form-label" style={{ marginBottom: 0 }}>
+                업체명 <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <button
+                type="button"
+                onClick={handleSaveIdentifier}
+                disabled={isScanning || !identifiers.name.trim()}
+                style={{
+                  fontSize: '0.72em', padding: '2px 8px', borderRadius: 4,
+                  border: '1px solid #d1d5db', background: '#f9fafb',
+                  color: '#374151', cursor: identifiers.name.trim() ? 'pointer' : 'not-allowed',
+                  whiteSpace: 'nowrap',
+                }}
+                title="업체명·도메인·ID를 저장"
+              >💾 저장</button>
+            </div>
 
             {/* 저장된 업체 드롭다운 */}
             {(savedIdentifiers.length > 0 || historyNames.length > 0) && (
