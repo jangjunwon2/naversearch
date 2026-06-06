@@ -28,13 +28,31 @@ function PowerLinkCell({ pl }) {
   );
 }
 
+function TabSearchResult({ tab }) {
+  if (!tab) return null;
+  if (!tab.found) return <div style={{ fontSize: '0.82em', color: '#9ca3af', marginTop: 2 }}>플레이스 탭 미발견</div>;
+  return (
+    <div style={{ marginTop: 2 }}>
+      <div style={{ fontSize: '0.82em', color: '#6b7280' }}>
+        플레이스 탭 {tab.page}p {tab.position}번째
+        <span style={{ color: '#9ca3af', marginLeft: 4 }}>(유기 {tab.organicRank}위 / 전체 {tab.total ?? '?'}개)</span>
+      </div>
+      {tab.adPage != null && (
+        <div style={{ fontSize: '0.82em', color: '#92400e' }}>
+          광고 탭 {tab.adPage}p {tab.adPosition}번째
+          <span style={{ color: '#9ca3af', marginLeft: 4 }}>(광고 {tab.adRank}위)</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PlaceCell({ pl }) {
   if (pl.exposed) {
     const hasBoth = pl.adRank != null && pl.organicRank != null;
     return (
       <div>
         {hasBoth ? (
-          // 광고·일반 모두 노출
           <span>
             <span style={{ color: '#92400e', fontWeight: 'bold' }}>광고 {pl.adRank}위</span>
             <span style={{ color: '#9ca3af', margin: '0 4px' }}>/</span>
@@ -55,32 +73,16 @@ function PlaceCell({ pl }) {
         <span style={{ color: '#9ca3af', fontWeight: 'normal', fontSize: '0.78em', marginLeft: 6 }}>
           (총 {pl.totalPlaces}개)
         </span>
+        <TabSearchResult tab={pl.tabSearch} />
       </div>
     );
   }
   const tab = pl.tabSearch;
   if (!tab) return <span style={{ color: '#9ca3af', fontSize: '0.85em' }}>미노출</span>;
-  if (tab.found) {
-    return (
-      <div>
-        <span style={{ color: '#9ca3af', fontSize: '0.85em' }}>미노출 (통합검색)</span>
-        <div style={{ fontSize: '0.82em', marginTop: 2, color: '#6b7280' }}>
-          일반 탭 {tab.page}페이지 {tab.position}번째
-          <span style={{ color: '#9ca3af', marginLeft: 4 }}>(유기 {tab.organicRank ?? tab.overallRank}위 / 전체 {tab.total ?? '?'}개)</span>
-        </div>
-        {tab.adPage != null && (
-          <div style={{ fontSize: '0.82em', marginTop: 1, color: '#92400e' }}>
-            광고 탭 {tab.adPage}페이지 {tab.adPosition}번째
-            <span style={{ color: '#9ca3af', marginLeft: 4 }}>(광고 {tab.adRank}위)</span>
-          </div>
-        )}
-      </div>
-    );
-  }
   return (
     <div>
-      <span style={{ color: '#9ca3af', fontSize: '0.85em' }}>미노출 (통합검색)</span>
-      <div style={{ fontSize: '0.82em', marginTop: 2, color: '#9ca3af' }}>탭 미발견</div>
+      <span style={{ color: '#9ca3af', fontSize: '0.85em' }}>통합검색 미노출</span>
+      <TabSearchResult tab={tab} />
     </div>
   );
 }

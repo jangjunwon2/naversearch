@@ -96,11 +96,8 @@ async function runScan(scanId, { keywords, identifiers }) {
         const organicPlace = matchedPlaces.find((p) => !p.isAd) || null;
         const bestPlace = adPlace || organicPlace;
 
-        // 플레이스 미노출 시 탭 딥서치
-        let tabSearch = null;
-        if (!bestPlace) {
-          tabSearch = await scrapePlaceTab(keyword, identifiers, 3);
-        }
+        // 플레이스 탭 딥서치 — 통합검색 노출 여부와 무관하게 항상 실행
+        const tabSearch = await scrapePlaceTab(keyword, identifiers);
 
         keywordResult = {
           keyword,
@@ -118,7 +115,7 @@ async function runScan(scanId, { keywords, identifiers }) {
                 isAd: bestPlace.isAd,
                 rating: bestPlace.rating,
                 reviewCount: bestPlace.reviewCount,
-                tabSearch: null,
+                tabSearch,
               }
             : { exposed: false, rank: null, adRank: null, organicRank: null, totalPlaces: placeItems.length, name: null, isAd: false, rating: null, reviewCount: null, tabSearch },
         };
