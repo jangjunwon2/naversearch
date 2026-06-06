@@ -70,7 +70,12 @@ function parsePlaces($) {
     const reviewText = $el.find('[class*="review"], [class*="cnt"], [class*="count"]').first().text().trim();
     const reviewMatch = reviewText.match(/[\d,]+/);
     const reviewCount = reviewMatch ? parseInt(reviewMatch[0].replace(/,/g, ''), 10) : null;
-    items.push({ rank: items.length + 1, name, placeId, rating, reviewCount });
+
+    // 광고 여부: 클래스에 ad 포함하는 뱃지 또는 텍스트 "광고" 감지
+    const isAd = $el.find('[class*="ad_label"], [class*="badge_ad"], [class*="sp_ad"], [class*="ad_badge"]').length > 0
+      || $el.find('em, span').filter((_, e) => $(e).text().trim() === '광고').length > 0;
+
+    items.push({ rank: items.length + 1, name, placeId, rating, reviewCount, isAd });
   });
   return items;
 }

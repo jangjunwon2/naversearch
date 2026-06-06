@@ -91,4 +91,18 @@ describe('parsePlaces', () => {
     assert.equal(item.rating, 4.5);
     assert.equal(item.reviewCount, 1234);
   });
+
+  test('광고 뱃지가 있으면 isAd=true', () => {
+    const html = `
+      <div class="splace_section">
+        <ul>
+          <li><a class="place_bluelink" href="/place/111">광고업체</a><span class="ad_label">광고</span></li>
+          <li><a class="place_bluelink" href="/place/222">일반업체</a></li>
+        </ul>
+      </div>`;
+    const $ = cheerio.load(html);
+    const items = parsePlaces($);
+    assert.equal(items[0].isAd, true);
+    assert.equal(items[1].isAd, false);
+  });
 });

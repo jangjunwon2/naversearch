@@ -1,6 +1,7 @@
 // 파워링크·플레이스 스캔 엔진 — SSE 진행률 + 매칭 로직
 // scanEngine.js 와 동일한 인터페이스를 구현해 /api/scan/progress SSE 핸들러를 공유한다.
 const { scrapeFullPage } = require('./fullPageScraper');
+const { scrapePlaceTab } = require('./placeTabScraper');
 const { sleep } = require('./naverClient');
 const store = require('./store');
 
@@ -85,14 +86,21 @@ async function runScan(scanId, { keywords, identifiers }) {
         const { powerLinkItems, placeItems } = await scrapeFullPage(keyword);
         const matchedPL = matchPowerLink(powerLinkItems, identifiers);
         const matchedPlace = matchPlace(placeItems, identifiers);
+
+        // 플레이스 미노출 시 탭 딥서치
+        let tabSearch = null;
+        if (!matchedPlace) {
+          tabSearch = await scrapePlaceTab(keyword, identifiers, 3);
+        }
+
         keywordResult = {
           keyword,
           powerLink: matchedPL
             ? { exposed: true, rank: matchedPL.rank, totalAds: powerLinkItems.length, title: matchedPL.title, url: matchedPL.url }
             : { exposed: false, rank: null, totalAds: powerLinkItems.length, title: null, url: null },
           place: matchedPlace
-            ? { exposed: true, rank: matchedPlace.rank, totalPlaces: placeItems.length, name: matchedPlace.name, rating: matchedPlace.rating, reviewCount: matchedPlace.reviewCount }
-            : { exposed: false, rank: null, totalPlaces: placeItems.length, name: null, rating: null, reviewCount: null },
+            ? { exposed: true, rank: matchedPlace.rank, totalPlaces: placeItems.length, name: matchedPlace.name, isAd: matchedPlace.isAd, rating: matchedPlace.rating, reviewCount: matchedPlace.reviewCount, tabSearch: null }
+            : { exposed: false, rank: null, totalPlaces: placeItems.length, name: null, isAd: false, rating: null, reviewCount: null, tabSearch },
         };
         sendSSE({ type: 'keyword_scanned', current: i + 1, total: keywords.length, keyword, result: keywordResult });
       } catch (err) {
