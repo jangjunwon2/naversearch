@@ -1,4 +1,13 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+
+const PRESETS_KEY = 'adplace_kw_presets';
+
+function loadPresets() {
+  try { return JSON.parse(localStorage.getItem(PRESETS_KEY) || '[]'); } catch { return []; }
+}
+function savePresets(presets) {
+  localStorage.setItem(PRESETS_KEY, JSON.stringify(presets));
+}
 
 function rankColor(rank) {
   if (!rank) return '#9ca3af';
@@ -7,11 +16,8 @@ function rankColor(rank) {
   return '#6b7280';
 }
 
-// 파워링크 순위 셀
 function PowerLinkCell({ pl }) {
-  if (!pl.exposed) {
-    return <span style={{ color: '#9ca3af', fontSize: '0.85em' }}>미노출</span>;
-  }
+  if (!pl.exposed) return <span style={{ color: '#9ca3af', fontSize: '0.85em' }}>미노출</span>;
   return (
     <span style={{ color: rankColor(pl.rank), fontWeight: 'bold' }}>
       {pl.rank}위
@@ -22,22 +28,15 @@ function PowerLinkCell({ pl }) {
   );
 }
 
-// 플레이스 순위 셀
 function PlaceCell({ pl }) {
   if (pl.exposed) {
     return (
       <div>
-        <span style={{ color: rankColor(pl.rank), fontWeight: 'bold' }}>
-          {pl.rank}위
-        </span>
+        <span style={{ color: rankColor(pl.rank), fontWeight: 'bold' }}>{pl.rank}위</span>
         <span style={{
-          marginLeft: 6,
-          fontSize: '0.75em',
-          padding: '1px 5px',
-          borderRadius: 3,
+          marginLeft: 6, fontSize: '0.75em', padding: '1px 5px', borderRadius: 3,
           background: pl.isAd ? '#fef3c7' : '#e0f2fe',
-          color: pl.isAd ? '#92400e' : '#0369a1',
-          fontWeight: 600,
+          color: pl.isAd ? '#92400e' : '#0369a1', fontWeight: 600,
         }}>
           {pl.isAd ? '광고' : '일반'}
         </span>
@@ -47,12 +46,8 @@ function PlaceCell({ pl }) {
       </div>
     );
   }
-
-  // 미노출 — 탭 딥서치 결과 표시
   const tab = pl.tabSearch;
-  if (!tab) {
-    return <span style={{ color: '#9ca3af', fontSize: '0.85em' }}>미노출</span>;
-  }
+  if (!tab) return <span style={{ color: '#9ca3af', fontSize: '0.85em' }}>미노출</span>;
   if (tab.found) {
     return (
       <div>
@@ -67,7 +62,38 @@ function PlaceCell({ pl }) {
   return (
     <div>
       <span style={{ color: '#9ca3af', fontSize: '0.85em' }}>미노출 (통합검색)</span>
-      <div style={{ fontSize: '0.82em', marginTop: 2, color: '#9ca3af' }}>탭 3페이지 이내 미발견</div>
+      <div style={{ fontSize: '0.82em', marginTop: 2, color: '#9ca3af' }}>탭 5페이지 이내 미발견</div>
+    </div>
+  );
+}
+
+// 프리셋 저장 모달
+function SavePresetModal({ onSave, onCancel }) {
+  const [name, setName] = useState('');
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 9999,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      <div style={{
+        background: '#fff', borderRadius: 10, padding: '24px 28px',
+        minWidth: 280, boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+      }}>
+        <p style={{ fontWeight: 600, marginBottom: 12 }}>프리셋 이름</p>
+        <input
+          className="form-input"
+          autoFocus
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) onSave(name.trim()); }}
+          placeholder="예: 광주 방탈출 키워드"
+          style={{ marginBottom: 16 }}
+        />
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button className="btn btn-secondary" onClick={onCancel} style={{ padding: '6px 14px' }}>취소</button>
+          <button className="btn btn-primary" onClick={() => name.trim() && onSave(name.trim())} style={{ padding: '6px 14px' }}>저장</button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -80,10 +106,36 @@ export default function AdPlaceScanPanel() {
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [currentKeyword, setCurrentKeyword] = useState('');
   const [error, setError] = useState('');
+  const [presets, setPresets] = useState(loadPresets);
+  const [showSaveModal, setShowSaveModal] = useState(false);
   const esRef = useRef(null);
   const scanIdRef = useRef(null);
 
   const updateId = (field) => (e) => setIdentifiers((prev) => ({ ...prev, [field]: e.target.value }));
+
+  // 프리셋 저장
+  const handleSavePreset = (presetName) => {
+    const kws = keywordsText.trim();
+    if (!kws) { setShowSaveModal(false); return; }
+    const updated = [{ name: presetName, keywords: kws }, ...presets.filter(p => p.name !== presetName)];
+    setPresets(updated);
+    savePresets(updated);
+    setShowSaveModal(false);
+  };
+
+  // 프리셋 불러오기
+  const handleLoadPreset = (presetName) => {
+    const preset = presets.find(p => p.name === presetName);
+    if (preset) setKeywordsText(preset.keywords);
+  };
+
+  // 프리셋 삭제
+  const handleDeletePreset = (presetName, e) => {
+    e.stopPropagation();
+    const updated = presets.filter(p => p.name !== presetName);
+    setPresets(updated);
+    savePresets(updated);
+  };
 
   const handleStart = async () => {
     const keywords = keywordsText.split('\n').map((k) => k.trim()).filter(Boolean);
@@ -119,14 +171,11 @@ export default function AdPlaceScanPanel() {
           setResults((prev) => [...prev, data.result]);
           setProgress({ current: data.current, total: data.total });
         } else if (data.type === 'keyword_error') {
-          setResults((prev) => [
-            ...prev,
-            {
-              keyword: data.keyword,
-              powerLink: { exposed: false, rank: null, totalAds: 0 },
-              place: { exposed: false, rank: null, totalPlaces: 0, isAd: false, tabSearch: null },
-            },
-          ]);
+          setResults((prev) => [...prev, {
+            keyword: data.keyword,
+            powerLink: { exposed: false, rank: null, totalAds: 0 },
+            place: { exposed: false, rank: null, totalPlaces: 0, isAd: false, tabSearch: null },
+          }]);
           setProgress({ current: data.current, total: data.total });
         } else if (data.type === 'complete' || data.type === 'cancelled') {
           setIsScanning(false);
@@ -157,22 +206,77 @@ export default function AdPlaceScanPanel() {
 
   return (
     <div className="app-grid">
+      {showSaveModal && (
+        <SavePresetModal
+          onSave={handleSavePreset}
+          onCancel={() => setShowSaveModal(false)}
+        />
+      )}
+
       <aside className="sidebar">
         <div className="panel-section">
           <h2 className="panel-title">파워링크 · 플레이스 순위</h2>
 
+          {/* 키워드 입력 */}
           <div className="form-group">
-            <label className="form-label">키워드 (줄바꿈으로 구분)</label>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+              <label className="form-label" style={{ marginBottom: 0 }}>키워드 (줄바꿈으로 구분)</label>
+              <button
+                onClick={() => setShowSaveModal(true)}
+                disabled={isScanning || !keywordsText.trim()}
+                style={{
+                  fontSize: '0.75em', padding: '2px 8px', borderRadius: 4,
+                  border: '1px solid #d1d5db', background: '#f9fafb',
+                  cursor: keywordsText.trim() ? 'pointer' : 'not-allowed',
+                  color: '#374151',
+                }}
+              >
+                프리셋 저장
+              </button>
+            </div>
             <textarea
               className="form-textarea"
-              rows={6}
+              rows={5}
               value={keywordsText}
               onChange={(e) => setKeywordsText(e.target.value)}
-              placeholder={'강남 치과\n임플란트 비용\n치아교정'}
+              placeholder={'광주 방탈출\n이스케이프탑\n방탈출 광주'}
               disabled={isScanning}
             />
           </div>
 
+          {/* 저장된 프리셋 */}
+          {presets.length > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              <p style={{ fontSize: '0.78em', color: '#6b7280', marginBottom: 5 }}>저장된 프리셋</p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                {presets.map((p) => (
+                  <div
+                    key={p.name}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 3,
+                      padding: '3px 8px', borderRadius: 14,
+                      background: '#eff6ff', border: '1px solid #bfdbfe',
+                      cursor: 'pointer', fontSize: '0.78em',
+                    }}
+                    onClick={() => handleLoadPreset(p.name)}
+                  >
+                    <span style={{ color: '#1d4ed8' }}>{p.name}</span>
+                    <button
+                      onClick={(e) => handleDeletePreset(p.name, e)}
+                      style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: '#93c5fd', fontSize: '0.9em', padding: '0 1px',
+                        lineHeight: 1,
+                      }}
+                      title="삭제"
+                    >×</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 식별자 입력 */}
           <div className="form-group">
             <label className="form-label">
               업체명 <span style={{ color: '#ef4444' }}>*</span>
@@ -182,9 +286,12 @@ export default function AdPlaceScanPanel() {
               type="text"
               value={identifiers.name}
               onChange={updateId('name')}
-              placeholder="홍길동치과"
+              placeholder="이스케이프탑"
               disabled={isScanning}
             />
+            <p style={{ fontSize: '0.75em', color: '#9ca3af', marginTop: 3, marginBottom: 0 }}>
+              이름 일부만 입력해도 포함 여부로 매칭됩니다
+            </p>
           </div>
 
           <div className="form-group">
@@ -197,7 +304,7 @@ export default function AdPlaceScanPanel() {
               type="text"
               value={identifiers.domain}
               onChange={updateId('domain')}
-              placeholder="hgd-dental.com"
+              placeholder="example.com"
               disabled={isScanning}
             />
           </div>
@@ -205,18 +312,18 @@ export default function AdPlaceScanPanel() {
           <div className="form-group">
             <label className="form-label">
               플레이스 ID{' '}
-              <span style={{ color: '#9ca3af', fontSize: '0.8em' }}>(선택 · 지도 URL의 숫자)</span>
+              <span style={{ color: '#9ca3af', fontSize: '0.8em' }}>(선택 · 정확도 최고)</span>
             </label>
             <input
               className="form-input"
               type="text"
               value={identifiers.placeId}
               onChange={updateId('placeId')}
-              placeholder="1234567890"
+              placeholder="37695692"
               disabled={isScanning}
             />
-            <p style={{ fontSize: '0.75em', color: '#9ca3af', marginTop: 4, marginBottom: 0 }}>
-              네이버 지도에서 매장 클릭 → URL의 숫자 (예: /place/<b>1234567890</b>)
+            <p style={{ fontSize: '0.75em', color: '#9ca3af', marginTop: 3, marginBottom: 0 }}>
+              네이버 지도 → 업체 클릭 → URL의 숫자
             </p>
           </div>
 
@@ -226,20 +333,16 @@ export default function AdPlaceScanPanel() {
 
           {isScanning ? (
             <>
-              <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '8px' }}>
+              <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '6px' }}>
                 {progress.current}/{progress.total} · {currentKeyword}
               </p>
               <p style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '8px' }}>
-                플레이스 미노출 시 탭 딥서치로 추가 시간이 소요됩니다.
+                미노출 시 플레이스 탭 딥서치로 추가 시간 소요
               </p>
-              <button className="btn btn-danger" onClick={handleCancel}>
-                스캔 중단
-              </button>
+              <button className="btn btn-danger" onClick={handleCancel}>스캔 중단</button>
             </>
           ) : (
-            <button className="btn btn-primary" onClick={handleStart}>
-              스캔 시작
-            </button>
+            <button className="btn btn-primary" onClick={handleStart}>스캔 시작</button>
           )}
         </div>
       </aside>
@@ -250,9 +353,9 @@ export default function AdPlaceScanPanel() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
               <thead>
                 <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
-                  <th style={{ textAlign: 'left', padding: '10px 12px', width: '35%' }}>키워드</th>
-                  <th style={{ textAlign: 'center', padding: '10px 12px', width: '25%' }}>파워링크</th>
-                  <th style={{ textAlign: 'left', padding: '10px 12px', width: '40%' }}>플레이스</th>
+                  <th style={{ textAlign: 'left', padding: '10px 12px', width: '32%' }}>키워드</th>
+                  <th style={{ textAlign: 'center', padding: '10px 12px', width: '22%' }}>파워링크</th>
+                  <th style={{ textAlign: 'left', padding: '10px 12px', width: '46%' }}>플레이스</th>
                 </tr>
               </thead>
               <tbody>
@@ -274,7 +377,7 @@ export default function AdPlaceScanPanel() {
           <div style={{ textAlign: 'center', color: '#9ca3af', marginTop: '6rem' }}>
             <p>키워드와 업체 정보를 입력하고 스캔을 시작하세요.</p>
             <p style={{ fontSize: '0.82em', marginTop: '6px' }}>
-              플레이스 미노출 시 탭을 자동으로 딥서치해 페이지·순위를 찾습니다.
+              통합검색 플레이스 블록 + 미노출 시 플레이스 탭 딥서치
             </p>
           </div>
         )}

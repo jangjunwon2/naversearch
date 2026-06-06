@@ -1,41 +1,56 @@
-// 플레이스 탭 딥서치 — 통합검색 플레이스 블록 미노출 시 탭 내 페이지·순위 탐색
-// blogTab.js 와 동일한 구조, 플레이스 탭(where=place) 대상
-const cheerio = require('cheerio');
+// 플레이스 탭 딥서치 — 통합검색 미노출 시 Naver 플레이스 탭 내 페이지·순위 탐색
+// Naver 플레이스 탭은 Apollo GraphQL 캐시를 script 태그에 임베딩하므로 JSON 파싱으로 추출
 const { defaultHeaders, sleep } = require('./naverClient');
 
 const NAVER_SEARCH = 'https://search.naver.com/search.naver';
-const ITEMS_PER_PAGE = 15; // 플레이스 탭 페이지당 기본 항목 수
+const ITEMS_PER_PAGE = 15;
 
-// 플레이스 탭 아이템 셀렉터 (순서대로 시도, 첫 매칭 사용)
-const ITEM_SELECTORS = [
-  '[class*="place_item"]',
-  '[class*="place_unit"]',
-  '.place_list li',
-  'li[class*="item"]',
-];
-
-// 업체명/placeId 정규화 함수
 function normalize(str) { return (str || '').replace(/\s/g, '').toLowerCase(); }
 
-function extractPlaceId($el, $) {
-  let placeId = null;
-  $el.find('a').each((_, a) => {
-    const m = ($(a).attr('href') || '').match(/\/place\/(\d+)/);
-    if (m) { placeId = m[1]; return false; }
-  });
-  return placeId;
+/**
+ * HTML에서 AttractionListItem 배열을 순서대로 추출
+ * - "items":[{"__ref":"AttractionListItem:ID"},...] → 표시 순서
+ * - "AttractionListItem:ID":{..."name":"NAME"...} → 이름 매핑
+ */
+function extractAttractionItems(html) {
+  // 1. "items" 배열에서 ID 순서 추출 (AttractionListItem __ref 포함된 것만)
+  const itemsMatch = html.match(/"items"\s*:\s*\[([^\]]*AttractionListItem[^\]]*)\]/);
+  if (!itemsMatch) return [];
+
+  const idOrder = [];
+  const refPattern = /"__ref"\s*:\s*"AttractionListItem:(\d+)"/g;
+  let m;
+  while ((m = refPattern.exec(itemsMatch[1])) !== null) {
+    idOrder.push(m[1]);
+  }
+  if (idOrder.length === 0) return [];
+
+  // 2. 각 ID의 이름 추출 ("AttractionListItem:ID":{..."name":"NAME"...})
+  return idOrder.map((id, i) => {
+    const prefix = `"AttractionListItem:${id}":`;
+    const start = html.indexOf(prefix);
+    let name = null;
+    if (start >= 0) {
+      const segment = html.slice(start, start + 600);
+      const nm = segment.match(/"name"\s*:\s*"([^"]+)"/);
+      if (nm) name = nm[1];
+    }
+    return name ? { rank: i + 1, placeId: id, name } : null;
+  }).filter(Boolean);
 }
 
-function matchItem($el, $, identifiers) {
-  const name = $el.find('[class*="place_bluelink"], [class*="name"], a').first().text().trim();
-  const placeId = extractPlaceId($el, $);
-
-  if (identifiers.placeId && placeId === identifiers.placeId) return true;
-  if (identifiers.name && normalize(name).includes(normalize(identifiers.name))) return true;
+function matchItem(item, identifiers) {
+  if (identifiers.placeId && item.placeId === identifiers.placeId) return true;
+  if (identifiers.name) {
+    const normTarget = normalize(identifiers.name);
+    const normName = normalize(item.name);
+    // 양방향 부분 일치: 어느 쪽이 다른 쪽에 포함되면 매칭
+    if (normName.includes(normTarget) || normTarget.includes(normName)) return true;
+  }
   return false;
 }
 
-async function scrapePlaceTab(keyword, identifiers, maxPages = 3) {
+async function scrapePlaceTab(keyword, identifiers, maxPages = 5) {
   for (let page = 1; page <= maxPages; page++) {
     const start = (page - 1) * ITEMS_PER_PAGE + 1;
     const url = `${NAVER_SEARCH}?where=place&query=${encodeURIComponent(keyword)}&start=${start}`;
@@ -43,31 +58,27 @@ async function scrapePlaceTab(keyword, identifiers, maxPages = 3) {
     try {
       const res = await fetch(url, { headers: defaultHeaders() });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const $ = cheerio.load(await res.text());
+      const html = await res.text();
 
-      for (const sel of ITEM_SELECTORS) {
-        const items = $(sel);
-        if (!items.length) continue;
+      const items = extractAttractionItems(html);
+      console.log(`[placeTab] "${keyword}" 페이지 ${page}: ${items.length}개 항목`);
 
-        let found = null;
-        items.each((i, el) => {
-          if (found) return false;
-          if (matchItem($(el), $, identifiers)) {
-            const position = i + 1;
-            found = {
-              found: true,
-              page,
-              position,
-              overallRank: (page - 1) * ITEMS_PER_PAGE + position,
-            };
-          }
-        });
+      if (items.length === 0) break; // 더 이상 결과 없음
 
-        if (found) return found;
-        break; // 첫 매칭 셀렉터에서 결과 없으면 다음 페이지로
+      for (let i = 0; i < items.length; i++) {
+        if (matchItem(items[i], identifiers)) {
+          const position = i + 1;
+          console.log(`[placeTab] 매칭: "${items[i].name}" → 페이지 ${page}, ${position}번째`);
+          return {
+            found: true,
+            page,
+            position,
+            overallRank: (page - 1) * ITEMS_PER_PAGE + position,
+          };
+        }
       }
     } catch (err) {
-      console.error(`플레이스 탭 검색 오류 (페이지 ${page}):`, err.message);
+      console.error(`[placeTab] 오류 (페이지 ${page}):`, err.message);
     }
 
     if (page < maxPages) await sleep(1000 + Math.random() * 1000);
@@ -76,4 +87,4 @@ async function scrapePlaceTab(keyword, identifiers, maxPages = 3) {
   return { found: false, page: null, position: null, overallRank: null };
 }
 
-module.exports = { scrapePlaceTab };
+module.exports = { scrapePlaceTab, extractAttractionItems };

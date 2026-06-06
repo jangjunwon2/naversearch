@@ -2,7 +2,7 @@
 const { describe, test } = require('node:test');
 const assert = require('node:assert/strict');
 const cheerio = require('cheerio');
-const { parsePowerLinks, parsePlaces, extractDomain } = require('../fullPageScraper');
+const { parsePowerLinks, parsePlaces, extractDomain, extractAttractionItems } = require('../fullPageScraper');
 
 describe('extractDomain', () => {
   test('www를 제거하고 hostname 반환', () => {
@@ -104,5 +104,38 @@ describe('parsePlaces', () => {
     const items = parsePlaces($);
     assert.equal(items[0].isAd, true);
     assert.equal(items[1].isAd, false);
+  });
+
+  test('JSON 임베딩이 있으면 JSON 파싱을 우선 사용한다', () => {
+    const html = `<script>
+      {"items":[{"__ref":"AttractionListItem:111"},{"__ref":"AttractionListItem:222"}],
+       "AttractionListItem:111":{"__typename":"AttractionListItem","id":"111","name":"매장A"},
+       "AttractionListItem:222":{"__typename":"AttractionListItem","id":"222","name":"매장B"}}
+    </script>`;
+    const $ = cheerio.load(html);
+    const items = parsePlaces($, html);
+    assert.equal(items.length, 2);
+    assert.equal(items[0].name, '매장A');
+    assert.equal(items[0].placeId, '111');
+    assert.equal(items[1].name, '매장B');
+  });
+});
+
+describe('extractAttractionItems', () => {
+  test('items 배열 순서대로 placeId·name을 추출한다', () => {
+    const html = `{"items":[{"__ref":"AttractionListItem:100"},{"__ref":"AttractionListItem:200"}],
+      "AttractionListItem:100":{"__typename":"AttractionListItem","id":"100","name":"가게A"},
+      "AttractionListItem:200":{"__typename":"AttractionListItem","id":"200","name":"가게B"}}`;
+    const items = extractAttractionItems(html);
+    assert.equal(items.length, 2);
+    assert.equal(items[0].rank, 1);
+    assert.equal(items[0].name, '가게A');
+    assert.equal(items[1].rank, 2);
+    assert.equal(items[1].name, '가게B');
+  });
+
+  test('AttractionListItem이 없으면 빈 배열 반환', () => {
+    const html = '{"items":[],"someOther":"data"}';
+    assert.deepEqual(extractAttractionItems(html), []);
   });
 });
